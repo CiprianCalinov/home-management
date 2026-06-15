@@ -214,6 +214,7 @@ def _default_car() -> dict[str, Any]:
             "change_date": None,
             "note": "",
         },
+        "interventions": [],
     }
 
 

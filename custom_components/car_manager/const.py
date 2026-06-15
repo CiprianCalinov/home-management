@@ -53,6 +53,7 @@ EQUIPMENT_BOOL_ITEMS = {
 # Cost categories
 COST_CATEGORIES = {
     "service": "Service / Intervenție",
+    "interventie": "Intervenție (piese)",
     "combustibil": "Combustibil",
     "asigurare": "Asigurare",
     "taxe": "Taxe",

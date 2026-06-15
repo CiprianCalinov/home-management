@@ -168,6 +168,17 @@ def compute_costs(data: dict[str, Any], today: date) -> dict[str, Any]:
             by_car.setdefault(car_id, {})
             by_car[car_id][cat] = by_car[car_id].get(cat, 0) + amount
 
+    # per-vehicle "alte intervenții" count as costs in their year
+    for car in (data.get("cars") or {}).values():
+        car_id = car.get("id")
+        for item in car.get("interventions") or []:
+            amount = item.get("amount") or 0
+            if amount and _entry_year(item) == year:
+                total_year += amount
+                by_category["interventie"] = by_category.get("interventie", 0) + amount
+                by_car.setdefault(car_id, {})
+                by_car[car_id]["interventie"] = by_car[car_id].get("interventie", 0) + amount
+
     # fuel as its own cost stream + consumption stats
     fuel_total_year = 0.0
     for entry in fuel:
