@@ -7,10 +7,10 @@
  */
 
 const LEGAL_DEFS = [
-  { key: "rca", label: "RCA", icon: "🛡️" },
-  { key: "itp", label: "ITP", icon: "🔧" },
-  { key: "rovinieta", label: "Rovinietă", icon: "🛣️" },
-  { key: "casco", label: "CASCO", icon: "🚙" },
+  { key: "rca", label: "RCA", hasStart: true, aida: true },
+  { key: "itp", label: "ITP" },
+  { key: "rovinieta", label: "Rovinietă" },
+  { key: "casco", label: "CASCO", hasStart: true },
 ];
 
 const SERVICE_DEFS = [
@@ -55,7 +55,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.5.0";
+const PANEL_VERSION = "0.6.0";
 
 // Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
 const ICONS = {
@@ -556,11 +556,18 @@ class CarManagerPanel extends HTMLElement {
   _legalSection(e) {
     const legal = e.legal || {};
     return `<div class="disc-list">${LEGAL_DEFS.map((d) => {
-      const val = legal[d.key] || "";
-      const body = `<label class="inline">Expiră la <input type="date" id="legdate-${d.key}" value="${esc(
-        val
-      )}"></label>`;
-      return this._discRow(`leg-${d.key}`, d.label, !!val, body);
+      const end = legal[d.key] || "";
+      const start = legal[`${d.key}_start`] || "";
+      const body = d.hasStart
+        ? `<label class="inline">Început <input type="date" id="legstart-${d.key}" value="${esc(start)}"></label>
+           <label class="inline">Expiră <input type="date" id="legdate-${d.key}" value="${esc(end)}"></label>
+           ${
+             d.aida
+               ? `<button class="btn" type="button" data-action="verify-rca">${icon("shield", 16)} Verifică pe aida.info.ro</button>`
+               : ""
+           }`
+        : `<label class="inline">Expiră la <input type="date" id="legdate-${d.key}" value="${esc(end)}"></label>`;
+      return this._discRow(`leg-${d.key}`, d.label, !!(end || start), body);
     }).join("")}</div>`;
   }
 
@@ -619,8 +626,13 @@ class CarManagerPanel extends HTMLElement {
     const legal = {};
     LEGAL_DEFS.forEach((d) => {
       const cb = this.shadowRoot.querySelector(`.cm-toggle[data-target="leg-${d.key}"]`);
+      const on = cb && cb.checked;
       const dt = this.shadowRoot.getElementById(`legdate-${d.key}`);
-      legal[d.key] = cb && cb.checked && dt && dt.value ? dt.value : null;
+      legal[d.key] = on && dt && dt.value ? dt.value : null;
+      if (d.hasStart) {
+        const st = this.shadowRoot.getElementById(`legstart-${d.key}`);
+        legal[`${d.key}_start`] = on && st && st.value ? st.value : null;
+      }
     });
     return legal;
   }
@@ -1176,6 +1188,9 @@ class CarManagerPanel extends HTMLElement {
       case "scan-talon":
         this._scan("talon");
         break;
+      case "verify-rca":
+        this._verifyRca();
+        break;
       case "add-cost":
         this._addCost();
         break;
@@ -1312,6 +1327,21 @@ class CarManagerPanel extends HTMLElement {
         gemini_model: g("set-gemini").value,
       },
     });
+  }
+
+  _verifyRca() {
+    const plateEl = this.shadowRoot.querySelector('[data-f="plate"]');
+    const vinEl = this.shadowRoot.getElementById("f-vin");
+    const plate = plateEl ? plateEl.value.trim() : "";
+    const vin = vinEl ? vinEl.value.trim() : "";
+    const q = plate || vin;
+    if (q && navigator.clipboard) navigator.clipboard.writeText(q).catch(() => {});
+    window.open("https://www.aida.info.ro/polite-rca", "_blank", "noopener");
+    this._toast(
+      q
+        ? `Am deschis aida.info.ro și am copiat „${q}" în clipboard. Bifează „nu sunt robot", apoi treci datele aici.`
+        : "Am deschis aida.info.ro. Introdu numărul sau VIN-ul acolo."
+    );
   }
 
   // ----------------------------------------------------------- scanare poză
