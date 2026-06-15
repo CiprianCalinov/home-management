@@ -166,6 +166,16 @@ async def ws_scan(hass, connection, msg):
     connection.send_result(msg["id"], result)
 
 
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/decode_vin", vol.Required("vin"): str}
+)
+@websocket_api.async_response
+async def ws_decode_vin(hass, connection, msg):
+    from .vision import async_decode_vin
+
+    connection.send_result(msg["id"], await async_decode_vin(hass, msg["vin"]))
+
+
 @callback
 def async_register_websocket(hass: HomeAssistant) -> None:
     """Register all panel websocket commands once."""
@@ -183,6 +193,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
         ws_update_settings,
         ws_import_merge,
         ws_scan,
+        ws_decode_vin,
     ):
         websocket_api.async_register_command(hass, handler)
     hass.data[DOMAIN]["ws_registered"] = True

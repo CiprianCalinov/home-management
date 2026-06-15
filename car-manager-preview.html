@@ -180,6 +180,8 @@
       delete_cost: (m) => { raw.costs = raw.costs.filter((c) => c.id !== m.entry_id); return snapshot(); },
       update_settings: (m) => { Object.assign(raw.settings, m.settings); return snapshot(); },
       import_merge: () => snapshot(),
+      // Decodare VIN demo (în HA real folosește serviciul NHTSA prin backend).
+      decode_vin: () => ({ ok: true, make: "Honda", model: "CR-V", year: "2005" }),
       // Scanarea returnează date demo fixe (nu citește efectiv poza în preview).
       scan: (m) => {
         const today = new Date().toISOString().slice(0, 10);

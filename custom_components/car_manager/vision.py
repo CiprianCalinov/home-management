@@ -15,7 +15,9 @@ import logging
 import re
 from typing import Any
 
+import aiohttp
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,13 +67,18 @@ def _find_credentials(hass: HomeAssistant, override_model: str) -> tuple[str | N
         key = entry.data.get("api_key")
         if not key:
             continue
-        model = override_model or ""
+        model = (override_model or "").strip()
         if not model:
             for sub in getattr(entry, "subentries", {}).values():
                 candidate = (getattr(sub, "data", None) or {}).get("chat_model")
-                if candidate:
-                    model = candidate.split("/")[-1]
-                    break
+                if not candidate:
+                    continue
+                name = candidate.split("/")[-1]
+                # Skip TTS / image-generation models — they can't read photos.
+                if "tts" in name.lower() or "image" in name.lower():
+                    continue
+                model = name
+                break
         return key, (model or DEFAULT_MODEL)
     return None, DEFAULT_MODEL
 
@@ -125,6 +132,27 @@ def _parse_json(text: str) -> dict[str, Any] | None:
             except (ValueError, TypeError):
                 return None
     return None
+
+
+async def async_decode_vin(hass: HomeAssistant, vin: str) -> dict[str, Any]:
+    """Decode a VIN to make/model/year via the free NHTSA vPIC API."""
+    code = (vin or "").strip().upper()
+    if len(code) != 17:
+        return {"ok": False, "error": "VIN invalid (trebuie să aibă 17 caractere)."}
+
+    session = async_get_clientsession(hass)
+    url = f"https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/{code}?format=json"
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=12)) as resp:
+            payload = await resp.json()
+    except Exception as err:  # noqa: BLE001
+        return {"ok": False, "error": f"Serviciul de decodare VIN nu a răspuns: {err}"}
+
+    results = (payload.get("Results") or [{}])[0]
+    make = (results.get("Make") or "").strip() or None
+    model = (results.get("Model") or "").strip() or None
+    year = (results.get("ModelYear") or "").strip() or None
+    return {"ok": True, "make": make, "model": model, "year": year}
 
 
 async def async_scan(

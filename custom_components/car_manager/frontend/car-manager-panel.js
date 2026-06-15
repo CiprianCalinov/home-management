@@ -55,7 +55,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.3.1";
+const PANEL_VERSION = "0.3.2";
 
 // Listă curată de mărci → modele (focus piața RO). „Altă marcă" / „Alt model"
 // permit scriere liberă pentru ce nu e în listă.
@@ -101,7 +101,7 @@ const WMI_MAKE = {
   VF7: "Citroën",
   ZFA: "Fiat", ZFF: "Fiat",
   SJN: "Nissan", VSK: "Nissan", JN1: "Nissan",
-  JHM: "Honda", SHH: "Honda", JHL: "Honda",
+  JHM: "Honda", SHH: "Honda", SHS: "Honda", JHL: "Honda",
   JMZ: "Mazda", JM1: "Mazda",
   YV1: "Volvo", YV4: "Volvo",
   VSS: "Seat",
@@ -544,7 +544,7 @@ class CarManagerPanel extends HTMLElement {
       </div>`;
   }
 
-  _decodeVin() {
+  async _decodeVin() {
     const vinEl = this.shadowRoot.getElementById("f-vin");
     const vin = (vinEl.value || "").trim().toUpperCase();
     vinEl.value = vin;
@@ -552,24 +552,35 @@ class CarManagerPanel extends HTMLElement {
       this._toast("VIN-ul trebuie să aibă exact 17 caractere.");
       return;
     }
-    const make = WMI_MAKE[vin.slice(0, 3)] || null;
-    const year = vinModelYear(vin[9]);
-    if (make) {
-      const makeSel = this.shadowRoot.getElementById("f-make-select");
-      makeSel.value = Object.prototype.hasOwnProperty.call(CAR_MAKES, make) ? make : "__other__";
-      makeSel.dispatchEvent(new Event("change"));
-      if (makeSel.value === "__other__") {
-        this.shadowRoot.getElementById("f-make-custom").value = make;
+    this._toast("Decodez VIN-ul…");
+    let make = null;
+    let model = null;
+    let year = null;
+    try {
+      const res = await this._call("decode_vin", { vin });
+      if (res && res.ok) {
+        make = res.make || null;
+        model = res.model || null;
+        year = res.year || null;
       }
+    } catch (err) {
+      /* cădem pe decodarea offline */
     }
-    if (year) this.shadowRoot.getElementById("f-year").value = year;
+    // Fallback offline pentru marcă/an dacă serviciul nu le-a întors.
+    if (!make) make = WMI_MAKE[vin.slice(0, 3)] || null;
+    if (!year) year = vinModelYear(vin[9]);
+
+    this._setMakeModel(make, model);
+    if (year) this._setField("f-year", year);
+
     const parts = [];
     if (make) parts.push(make);
+    if (model) parts.push(model);
     if (year) parts.push(year);
     this._toast(
       parts.length
-        ? `Din VIN: ${parts.join(", ")}. Alege modelul din listă.`
-        : "Nu am putut decoda marca/anul din acest VIN."
+        ? `Din VIN: ${parts.join(", ")}.${model ? "" : " Alege modelul din listă."}`
+        : "Nu am putut decoda nimic din acest VIN."
     );
   }
 
@@ -1214,14 +1225,21 @@ class CarManagerPanel extends HTMLElement {
     this._toast("Date completate din talon. Verifică și apasă Salvează.");
   }
 
+  _titleCase(s) {
+    return String(s).replace(/\w\S*/g, (t) => t[0].toUpperCase() + t.slice(1).toLowerCase());
+  }
+
   _setMakeModel(make, model) {
     if (make) {
       const ms = this.shadowRoot.getElementById("f-make-select");
       if (ms) {
-        ms.value = Object.prototype.hasOwnProperty.call(CAR_MAKES, make) ? make : "__other__";
+        const key = Object.keys(CAR_MAKES).find(
+          (k) => k.toLowerCase() === String(make).toLowerCase()
+        );
+        ms.value = key || "__other__";
         ms.dispatchEvent(new Event("change"));
         if (ms.value === "__other__")
-          this.shadowRoot.getElementById("f-make-custom").value = make;
+          this.shadowRoot.getElementById("f-make-custom").value = key || this._titleCase(make);
       }
     }
     if (model) {
