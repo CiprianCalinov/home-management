@@ -1,0 +1,40 @@
+# Car Manager — exemple de automatizări
+# Copiază în Setări → Automatizări → ⋮ → Editează în YAML, sau în automations.yaml.
+
+# 1) Notificare zilnică cu toate termenele care expiră în <= 30 zile.
+#    Serviciul construiește singur mesajul (RCA/ITP/rovinietă/revizii etc.).
+#    Înlocuiește notify.mobile_app_telefon cu serviciul tău (vezi Dev Tools → Servicii).
+- alias: Car Manager - termene apropiate (zilnic)
+  trigger:
+    - platform: time
+      at: "08:00:00"
+  action:
+    - service: car_manager.notify_due
+      data:
+        days: 30
+        notify_service: notify.mobile_app_telefon
+
+# 2) Variantă fără serviciu mobil — creează o notificare persistentă în HA.
+- alias: Car Manager - termene apropiate (persistent)
+  trigger:
+    - platform: time
+      at: "08:30:00"
+  action:
+    - service: car_manager.notify_due
+      data:
+        days: 30
+
+# 3) Alertă imediată când o mașină intră în stare „necesită atenție".
+#    Folosește binary_sensor-ul generat per mașină.
+- alias: Car Manager - alerta la schimbare stare
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.logan_necesita_atentie   # adaptează numele
+      to: "on"
+  action:
+    - service: notify.mobile_app_telefon
+      data:
+        title: "🚗 Car Manager"
+        message: >-
+          {{ state_attr('binary_sensor.logan_necesita_atentie', 'atentionari')
+             | map(attribute='label') | join(', ') }}

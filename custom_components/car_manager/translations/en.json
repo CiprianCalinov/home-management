@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Car Manager",
+        "description": "Set up Car Manager. You manage your vehicles from the Car Manager panel in the sidebar after setup."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Car Manager is already configured."
+    }
+  }
+}

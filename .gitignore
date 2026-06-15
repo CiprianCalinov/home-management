@@ -1,0 +1,6 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local preview / scratch (nu fac parte din integrare)
+car-management/

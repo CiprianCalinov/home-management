@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Car Manager — Preview</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #f3f5f8; }
+    #preview-bar {
+      font: 13px system-ui, sans-serif; background: #0f172a; color: #cbd5e1;
+      padding: 8px 14px; display: flex; gap: 10px; align-items: center;
+    }
+    #preview-bar b { color: #fff; }
+    #preview-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; }
+    car-manager-panel { display: block; height: calc(100% - 35px); overflow: auto; }
+  </style>
+  <!-- Componenta reală, încărcată ca script clasic (nu are import/export). -->
+  <script src="./custom_components/car_manager/frontend/car-manager-panel.js"></script>
+</head>
+<body>
+  <div id="preview-bar">
+    <span class="dot"></span>
+    <b>PREVIEW LOCAL</b> — backend simulat, date demo. Modificările NU se salvează (se pierd la refresh).
+  </div>
+
+  <script type="module">
+    // ----------------------------------------------------------------
+    // Mock al backend-ului car_manager: stochează datele în memorie și
+    // recalculează „view"-ul exact ca integrarea Python (compute.py).
+    // ----------------------------------------------------------------
+    const ALERT_DAYS = 30, ALERT_KM = 1000;
+    const LEGAL = ["rca", "itp", "rovinieta", "casco"];
+    const LABELS = { rca: "RCA", itp: "ITP", rovinieta: "Rovinietă", casco: "CASCO" };
+    const SVC = {
+      revizie: "Revizie", ulei: "Ulei motor", distributie: "Distribuție",
+      filtru_polen: "Filtru polen", lichid_frana: "Lichid frână", antigel: "Antigel",
+    };
+
+    const ord = (s) => {
+      if (!s) return null;
+      const d = new Date(s);
+      if (isNaN(d)) return null;
+      return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+    };
+    const ordToday = (t) => Math.floor(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 86400000);
+    const daysUntil = (s, t) => { const o = ord(s); return o == null ? null : o - ordToday(t); };
+
+    function computeLegal(car, t) {
+      const legal = car.legal || {}, r = {};
+      for (const f of LEGAL) {
+        const v = legal[f], days = daysUntil(v, t);
+        r[f] = { label: LABELS[f], expira: v || null, zile_ramase: days,
+          configured: v != null, alert: days != null && days <= ALERT_DAYS, expired: days != null && days < 0 };
+      }
+      return r;
+    }
+
+    function computeService(car, t) {
+      const mileage = car.mileage || 0, service = car.service || {}, r = {};
+      for (const key in SVC) {
+        const item = service[key];
+        if (!item) continue;
+        const ik = item.interval_km || 0, id = item.interval_days || 0;
+        let km = null;
+        if (ik && item.last_km != null) km = (item.last_km + ik) - mileage;
+        let dr = null;
+        const lo = ord(item.last_date);
+        if (id && lo != null) dr = (lo + id) - ordToday(t);
+        const alert = (km != null && km <= ALERT_KM) || (dr != null && dr <= ALERT_DAYS);
+        r[key] = { label: SVC[key], interval_km: ik, interval_days: id,
+          last_km: item.last_km ?? null, last_date: item.last_date || null,
+          km_remaining: km, days_remaining: dr, alert: !!alert,
+          overdue: (km != null && km < 0) || (dr != null && dr < 0) };
+      }
+      return r;
+    }
+
+    function attention(view) {
+      const a = [];
+      for (const f in view.legal) { const i = view.legal[f]; if (i.alert)
+        a.push({ type: "legal", key: f, label: i.label, days: i.zile_ramase, severity: i.expired ? "critic" : "atentie" }); }
+      for (const k in view.service) { const i = view.service[k]; if (i.alert)
+        a.push({ type: "service", key: k, label: i.label, days: i.days_remaining, km: i.km_remaining, severity: i.overdue ? "critic" : "atentie" }); }
+      a.sort((x, y) => (x.severity !== "critic") - (y.severity !== "critic") ||
+        ((x.days ?? 9999) - (y.days ?? 9999)));
+      return a;
+    }
+
+    function carView(car, t) {
+      const v = { id: car.id, name: car.name, make: car.make, model: car.model,
+        plate: car.plate, mileage: car.mileage || 0, legal: computeLegal(car, t), service: computeService(car, t) };
+      v.attention = attention(v);
+      v.status_ok = v.attention.length === 0;
+      return v;
+    }
+
+    function fuelConsumption(fuel) {
+      const per = {};
+      fuel.forEach((e) => { if (e.odometer && e.liters) (per[e.car_id] = per[e.car_id] || []).push(e); });
+      const res = {};
+      for (const cid in per) {
+        const es = per[cid].slice().sort((a, b) => (a.odometer || 0) - (b.odometer || 0));
+        let l = 0, km = 0, prev = null;
+        for (const e of es) { if (prev && e.full) { const d = (e.odometer || 0) - (prev.odometer || 0); if (d > 0) { km += d; l += e.liters || 0; } } prev = e; }
+        if (km > 0) res[cid] = Math.round((l / km) * 10000) / 100;
+      }
+      return res;
+    }
+
+    function buildView(raw, t) {
+      const year = t.getFullYear();
+      const eyear = (e) => { const d = new Date(e.date); return isNaN(d) ? null : d.getFullYear(); };
+      const byCat = {}, byCar = {}; let totalYear = 0;
+      (raw.costs || []).forEach((e) => {
+        if (eyear(e) === year) { const amt = e.amount || 0; totalYear += amt;
+          byCat[e.category] = (byCat[e.category] || 0) + amt;
+          byCar[e.car_id] = byCar[e.car_id] || {}; byCar[e.car_id][e.category] = (byCar[e.car_id][e.category] || 0) + amt; }
+      });
+      let fuelYear = 0;
+      (raw.fuel || []).forEach((e) => { if (eyear(e) === year) fuelYear += e.price_total || 0; });
+      const cars = Object.values(raw.cars || {}).map((c) => carView(c, t));
+      const alerts = cars.reduce((s, c) => s + c.attention.length, 0);
+      const critical = cars.reduce((s, c) => s + c.attention.filter((a) => a.severity === "critic").length, 0);
+      const costs = { year, total_year: Math.round(totalYear * 100) / 100, fuel_total_year: Math.round(fuelYear * 100) / 100,
+        grand_total_year: Math.round((totalYear + fuelYear) * 100) / 100, by_category: byCat, by_car: byCar, consumption: fuelConsumption(raw.fuel || []) };
+      return { today: t.toISOString().slice(0, 10),
+        fleet: { cars: cars.length, alerts, critical, status: alerts ? "Atenție" : "OK", cost_year: costs.grand_total_year },
+        cars, costs };
+    }
+
+    // -------------------------------------------------- date demo
+    const raw = {
+      cars: {
+        c1: { id: "c1", name: "Logan", make: "Dacia", model: "Logan", plate: "B 12 ABC", vin: "UU1...", year: 2018,
+          mileage: 82000, mileage_date: "2026-06-01",
+          legal: { rca: "2026-12-01", itp: "2026-07-01", rovinieta: "2026-09-10", casco: null },
+          service: { revizie: { last_km: 75000, last_date: "2025-09-01", interval_km: 15000, interval_days: 365 },
+                     lichid_frana: { last_date: "2023-01-01", interval_km: 0, interval_days: 730 } },
+          equipment: { trusa_medicala: "2027-05-01", stingator: "2026-08-01", vesta: true, triunghi: true },
+          battery: { install_date: "2024-03-15", warranty_months: 48 },
+          tires: { season: "vară", front_mm: 5.5, rear_mm: 6, change_date: "2026-04-01", note: "Michelin" } },
+        c2: { id: "c2", name: "Octavia", make: "Skoda", model: "Octavia", plate: "B 99 XYZ", vin: "TMB...", year: 2020,
+          mileage: 120000, mileage_date: "2026-06-10",
+          legal: { rca: "2026-06-25", itp: "2027-02-01", rovinieta: "2026-06-18", casco: "2026-10-01" },
+          service: { revizie: { last_km: 118000, last_date: "2025-12-01", interval_km: 15000, interval_days: 365 } },
+          equipment: { trusa_medicala: null, stingator: "2026-07-10", vesta: true, triunghi: false },
+          battery: { install_date: "2022-01-10", warranty_months: 36 },
+          tires: { season: "iarnă", front_mm: 4, rear_mm: 4.2, change_date: "2025-11-01", note: "" } },
+      },
+      fuel: [
+        { id: "f1", car_id: "c1", date: "2026-05-01", liters: 40, price_total: 300, odometer: 81500, full: true },
+        { id: "f2", car_id: "c1", date: "2026-06-01", liters: 42, price_total: 320, odometer: 82000, full: true },
+        { id: "f3", car_id: "c2", date: "2026-05-20", liters: 48, price_total: 360, odometer: 119400, full: true },
+        { id: "f4", car_id: "c2", date: "2026-06-10", liters: 50, price_total: 380, odometer: 120000, full: true },
+      ],
+      costs: [
+        { id: "x1", car_id: "c1", date: "2026-03-01", category: "service", amount: 450, note: "Revizie" },
+        { id: "x2", car_id: "c1", date: "2026-04-01", category: "asigurare", amount: 900, note: "RCA" },
+        { id: "x3", car_id: "c2", date: "2026-02-15", category: "anvelope", amount: 1200, note: "Set iarnă" },
+        { id: "x4", car_id: "c2", date: "2026-05-05", category: "taxe", amount: 200, note: "Rovinietă" },
+      ],
+      settings: { notify_enabled: true, notify_days: [30, 7, 1], notify_service: "" },
+    };
+
+    let seq = 100;
+    const newId = () => "id" + (++seq);
+    const deepMerge = (t, s) => { for (const k in s) {
+      if (s[k] && typeof s[k] === "object" && !Array.isArray(s[k]) && t[k] && typeof t[k] === "object") deepMerge(t[k], s[k]);
+      else t[k] = s[k]; } return t; };
+    const snapshot = () => JSON.parse(JSON.stringify({ raw, view: buildView(raw, new Date()) }));
+
+    const handlers = {
+      get_data: () => snapshot(),
+      add_car: (m) => { const id = m.car.id || newId(); raw.cars[id] = Object.assign({ id }, m.car); raw.cars[id].id = id; return snapshot(); },
+      update_car: (m) => { if (raw.cars[m.car_id]) deepMerge(raw.cars[m.car_id], m.car); return snapshot(); },
+      delete_car: (m) => { delete raw.cars[m.car_id]; raw.fuel = raw.fuel.filter((f) => f.car_id !== m.car_id); raw.costs = raw.costs.filter((c) => c.car_id !== m.car_id); return snapshot(); },
+      add_fuel: (m) => { raw.fuel.push(Object.assign({ id: newId() }, m.entry)); return snapshot(); },
+      delete_fuel: (m) => { raw.fuel = raw.fuel.filter((f) => f.id !== m.entry_id); return snapshot(); },
+      add_cost: (m) => { raw.costs.push(Object.assign({ id: newId() }, m.entry)); return snapshot(); },
+      delete_cost: (m) => { raw.costs = raw.costs.filter((c) => c.id !== m.entry_id); return snapshot(); },
+      update_settings: (m) => { Object.assign(raw.settings, m.settings); return snapshot(); },
+      import_merge: () => snapshot(),
+    };
+
+    const hass = {
+      connection: {
+        sendMessagePromise: (msg) => new Promise((resolve, reject) => {
+          const type = String(msg.type).replace("car_manager/", "");
+          const h = handlers[type];
+          setTimeout(() => (h ? resolve(h(msg)) : reject("unknown: " + type)), 60);
+        }),
+      },
+    };
+
+    const el = document.createElement("car-manager-panel");
+    el.hass = hass;
+    document.body.appendChild(el);
+  </script>
+</body>
+</html>
