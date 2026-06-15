@@ -55,7 +55,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.3.2";
+const PANEL_VERSION = "0.3.3";
 
 // Listă curată de mărci → modele (focus piața RO). „Altă marcă" / „Alt model"
 // permit scriere liberă pentru ce nu e în listă.
@@ -346,13 +346,15 @@ class CarManagerPanel extends HTMLElement {
   }
 
   _carCard(c) {
-    const chips = LEGAL_DEFS.map((d) => {
-      const info = c.legal[d.key];
-      return `<div class="chip ${this._chipClass(info)}">
+    const chips = LEGAL_DEFS.filter((d) => c.legal[d.key].configured)
+      .map((d) => {
+        const info = c.legal[d.key];
+        return `<div class="chip ${this._chipClass(info)}">
         <div class="chip-label">${d.label}</div>
         <div class="chip-val">${this._chipText(info)}</div>
       </div>`;
-    }).join("");
+      })
+      .join("");
 
     const svc = Object.values(c.service)
       .filter((s) => s.alert)
@@ -371,7 +373,7 @@ class CarManagerPanel extends HTMLElement {
         <div class="muted small">${esc(c.make || "")} ${esc(c.model || "")} · ${
       c.mileage ? c.mileage.toLocaleString("ro-RO") + " km" : "—"
     }</div>
-        <div class="chips">${chips}</div>
+        ${chips ? `<div class="chips">${chips}</div>` : `<div class="muted small" style="margin-top:8px">Niciun termen adăugat</div>`}
         ${svc ? `<div class="tags">${svc}</div>` : ""}
       </div>`;
   }
@@ -395,40 +397,12 @@ class CarManagerPanel extends HTMLElement {
 
   // ----------------------------------------------------------- car FORM
   _carForm() {
-    const raw = this._editingRaw();
     const e = this._editing;
-    const legal = (e.legal = e.legal || (raw && raw.legal) || {});
-    const service = (e.service = e.service || (raw && raw.service) || {});
+    e.legal = e.legal || {};
+    e.service = e.service || {};
+    e.equipment = e.equipment || {};
+    e.battery = e.battery || {};
     const isNew = !e.id;
-
-    const legalInputs = LEGAL_DEFS.map(
-      (d) => `
-      <label>${d.label} expiră la
-        <input type="date" data-f="legal.${d.key}" value="${esc(legal[d.key] || "")}">
-      </label>`
-    ).join("");
-
-    const serviceInputs = SERVICE_DEFS.map((d) => {
-      const s = service[d.key] || {};
-      return `
-        <div class="svc-row">
-          <div class="svc-label">${d.label}</div>
-          ${
-            d.date
-              ? `<label class="inline">Ultima dată<input type="date" data-f="service.${d.key}.last_date" value="${esc(
-                  s.last_date || ""
-                )}"></label>`
-              : ""
-          }
-          ${
-            d.km
-              ? `<label class="inline">La km<input type="number" data-f="service.${d.key}.last_km" value="${
-                  s.last_km ?? ""
-                }"></label>`
-              : ""
-          }
-        </div>`;
-    }).join("");
 
     return `
       <section class="card">
@@ -441,37 +415,17 @@ class CarManagerPanel extends HTMLElement {
           <button class="btn" type="button" data-action="scan-talon">📷 Scanează talonul</button>
         </div>
 
-        <h3>Termene legale</h3>
-        <div class="form-grid">${legalInputs}</div>
+        <h3>Termene legale <span class="hint">bifează ce are mașina</span></h3>
+        ${this._legalSection(e)}
 
-        <h3>Revizii & consumabile</h3>
-        <div class="svc-list">${serviceInputs}</div>
+        <h3>Revizii & consumabile <span class="hint">bifează ce urmărești</span></h3>
+        ${this._serviceSection(e)}
 
-        <h3>Dotări</h3>
-        <div class="form-grid">
-          <label>Trusă medicală expiră<input type="date" data-f="equipment.trusa_medicala" value="${esc(
-            (e.equipment && e.equipment.trusa_medicala) || ""
-          )}"></label>
-          <label>Stingător expiră<input type="date" data-f="equipment.stingator" value="${esc(
-            (e.equipment && e.equipment.stingator) || ""
-          )}"></label>
-          <label class="check"><input type="checkbox" data-f="equipment.vesta" ${
-            e.equipment && e.equipment.vesta ? "checked" : ""
-          }> Vestă reflectorizantă</label>
-          <label class="check"><input type="checkbox" data-f="equipment.triunghi" ${
-            e.equipment && e.equipment.triunghi ? "checked" : ""
-          }> Triunghi reflectorizant</label>
-        </div>
+        <h3>Dotări obligatorii <span class="hint">bifează ce ai în mașină</span></h3>
+        ${this._equipmentSection(e)}
 
         <h3>Baterie</h3>
-        <div class="form-grid">
-          <label>Data montării<input type="date" data-f="battery.install_date" value="${esc(
-            (e.battery && e.battery.install_date) || ""
-          )}"></label>
-          <label>Garanție (luni)<input type="number" data-f="battery.warranty_months" value="${
-            (e.battery && e.battery.warranty_months) ?? 48
-          }"></label>
-        </div>
+        ${this._batterySection(e)}
 
         <h3>Anvelope</h3>
         <div class="form-grid">
@@ -542,6 +496,147 @@ class CarManagerPanel extends HTMLElement {
         <label>An<input type="number" data-f="year" id="f-year" value="${e.year ?? ""}"></label>
         <label>Kilometraj<input type="number" data-f="mileage" value="${e.mileage ?? ""}"></label>
       </div>`;
+  }
+
+  // Switch elegant + corp care apare doar când e bifat.
+  _discRow(id, label, on, bodyHtml) {
+    return `
+      <div class="disc-row ${on ? "on" : ""}">
+        <label class="switch">
+          <input type="checkbox" class="cm-toggle" data-target="${id}" ${on ? "checked" : ""}>
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span class="switch-label">${label}</span>
+        </label>
+        ${
+          bodyHtml
+            ? `<div class="disc-body" id="${id}" ${on ? "" : 'style="display:none"'}>${bodyHtml}</div>`
+            : ""
+        }
+      </div>`;
+  }
+
+  _eqDate(v) {
+    if (v && typeof v === "object") return { has: !!(v.has || v.expira), expira: v.expira || "" };
+    if (typeof v === "string" && v) return { has: true, expira: v };
+    return { has: false, expira: "" };
+  }
+
+  _legalSection(e) {
+    const legal = e.legal || {};
+    return `<div class="disc-list">${LEGAL_DEFS.map((d) => {
+      const val = legal[d.key] || "";
+      const body = `<label class="inline">Expiră la <input type="date" id="legdate-${d.key}" value="${esc(
+        val
+      )}"></label>`;
+      return this._discRow(`leg-${d.key}`, d.label, !!val, body);
+    }).join("")}</div>`;
+  }
+
+  _serviceSection(e) {
+    const service = e.service || {};
+    return `<div class="disc-list">${SERVICE_DEFS.map((d) => {
+      const s = service[d.key] || {};
+      const on = !!(s.last_date || s.last_km != null);
+      const body = `
+        ${
+          d.date
+            ? `<label class="inline">Ultima dată <input type="date" id="svcdate-${d.key}" value="${esc(
+                s.last_date || ""
+              )}"></label>`
+            : ""
+        }
+        ${
+          d.km
+            ? `<label class="inline">La km <input type="number" id="svckm-${d.key}" value="${
+                s.last_km ?? ""
+              }"></label>`
+            : ""
+        }`;
+      return this._discRow(`svc-${d.key}`, d.label, on, body);
+    }).join("")}</div>`;
+  }
+
+  _equipmentSection(e) {
+    const eq = e.equipment || {};
+    const trusa = this._eqDate(eq.trusa_medicala);
+    const sting = this._eqDate(eq.stingator);
+    const dateBody = (id, item) =>
+      `<label class="inline">Expiră la <input type="date" id="${id}" value="${esc(item.expira)}"></label>`;
+    return `<div class="disc-list">
+      ${this._discRow("eq-trusa", "Trusă medicală", trusa.has, dateBody("eqdate-trusa", trusa))}
+      ${this._discRow("eq-sting", "Stingător", sting.has, dateBody("eqdate-sting", sting))}
+      ${this._discRow("eq-vesta", "Vestă reflectorizantă", !!eq.vesta, "")}
+      ${this._discRow("eq-triunghi", "Triunghi reflectorizant", !!eq.triunghi, "")}
+    </div>`;
+  }
+
+  _batterySection(e) {
+    const b = e.battery || {};
+    const on = !!(b.has || b.install_date);
+    const body = `
+      <label class="inline">Data montării <input type="date" id="bat-date" value="${esc(
+        b.install_date || ""
+      )}"></label>
+      <label class="inline">Garanție (luni) <input type="number" id="bat-warr" value="${
+        b.warranty_months ?? 48
+      }"></label>`;
+    return `<div class="disc-list">${this._discRow("bat", "Mașina are baterie urmărită", on, body)}</div>`;
+  }
+
+  _collectLegal() {
+    const legal = {};
+    LEGAL_DEFS.forEach((d) => {
+      const cb = this.shadowRoot.querySelector(`.cm-toggle[data-target="leg-${d.key}"]`);
+      const dt = this.shadowRoot.getElementById(`legdate-${d.key}`);
+      legal[d.key] = cb && cb.checked && dt && dt.value ? dt.value : null;
+    });
+    return legal;
+  }
+
+  _collectService() {
+    const service = {};
+    SERVICE_DEFS.forEach((d) => {
+      const cb = this.shadowRoot.querySelector(`.cm-toggle[data-target="svc-${d.key}"]`);
+      if (!cb || !cb.checked) return;
+      const dateEl = this.shadowRoot.getElementById(`svcdate-${d.key}`);
+      const kmEl = this.shadowRoot.getElementById(`svckm-${d.key}`);
+      const item = { ...(SERVICE_INTERVALS[d.key] || {}) };
+      if (dateEl && dateEl.value) item.last_date = dateEl.value;
+      if (kmEl && kmEl.value !== "") item.last_km = Number(kmEl.value);
+      if (item.last_date || item.last_km != null) service[d.key] = item;
+    });
+    return service;
+  }
+
+  _collectEquipment() {
+    const cb = (id) => this.shadowRoot.querySelector(`.cm-toggle[data-target="${id}"]`);
+    const val = (id) => this.shadowRoot.getElementById(id);
+    const trusaOn = !!(cb("eq-trusa") && cb("eq-trusa").checked);
+    const stingOn = !!(cb("eq-sting") && cb("eq-sting").checked);
+    return {
+      trusa_medicala: {
+        has: trusaOn,
+        expira: trusaOn && val("eqdate-trusa") && val("eqdate-trusa").value ? val("eqdate-trusa").value : null,
+      },
+      stingator: {
+        has: stingOn,
+        expira: stingOn && val("eqdate-sting") && val("eqdate-sting").value ? val("eqdate-sting").value : null,
+      },
+      vesta: !!(cb("eq-vesta") && cb("eq-vesta").checked),
+      triunghi: !!(cb("eq-triunghi") && cb("eq-triunghi").checked),
+    };
+  }
+
+  _collectBattery() {
+    const cb = this.shadowRoot.querySelector('.cm-toggle[data-target="bat"]');
+    const on = !!(cb && cb.checked);
+    const dt = this.shadowRoot.getElementById("bat-date");
+    const wr = this.shadowRoot.getElementById("bat-warr");
+    return {
+      has: on,
+      install_date: on && dt && dt.value ? dt.value : null,
+      warranty_months: wr && wr.value !== "" ? Number(wr.value) : 48,
+    };
   }
 
   async _decodeVin() {
@@ -778,18 +873,24 @@ class CarManagerPanel extends HTMLElement {
   _equipment() {
     const cars = Object.values(this._data.raw.cars || {});
     if (!cars.length) return this._emptyState();
-    return `<section class="card"><div class="overline">DOTĂRI</div><h2>Echipamente obligatorii</h2>
+    const tag = (label, has, extra) =>
+      `<span class="tag ${has ? "ok" : "warn"}">${esc(label)} ${has ? "✓" : "✗"}${
+        has && extra ? " · " + esc(extra) : ""
+      }</span>`;
+    return `<section class="card"><div class="overline">DOTĂRI</div><h2>Dotări obligatorii</h2>
       ${cars
         .map((c) => {
           const eq = c.equipment || {};
+          const trusa = this._eqDate(eq.trusa_medicala);
+          const sting = this._eqDate(eq.stingator);
           return `<div class="car">
           <div class="row-between"><div class="car-name">🚘 ${esc(c.name)}</div>
           <button class="btn" data-action="edit-car" data-id="${c.id}">Editează</button></div>
           <div class="tags">
-            <span class="tag ${eq.trusa_medicala ? "" : "warn"}">Trusă: ${esc(eq.trusa_medicala || "neconfigurat")}</span>
-            <span class="tag ${eq.stingator ? "" : "warn"}">Stingător: ${esc(eq.stingator || "neconfigurat")}</span>
-            <span class="tag ${eq.vesta ? "ok" : "warn"}">Vestă ${eq.vesta ? "✅" : "❌"}</span>
-            <span class="tag ${eq.triunghi ? "ok" : "warn"}">Triunghi ${eq.triunghi ? "✅" : "❌"}</span>
+            ${tag("Trusă medicală", trusa.has, trusa.expira ? "exp. " + trusa.expira : "")}
+            ${tag("Stingător", sting.has, sting.expira ? "exp. " + sting.expira : "")}
+            ${tag("Vestă", !!eq.vesta, "")}
+            ${tag("Triunghi", !!eq.triunghi, "")}
           </div></div>`;
         })
         .join("")}
@@ -919,6 +1020,15 @@ class CarManagerPanel extends HTMLElement {
       el.addEventListener("click", (ev) => this._onAction(el.dataset.action, el, ev))
     );
 
+    root.querySelectorAll(".cm-toggle").forEach((cb) =>
+      cb.addEventListener("change", () => {
+        const body = root.getElementById(cb.dataset.target);
+        if (body) body.style.display = cb.checked ? "" : "none";
+        const row = cb.closest(".disc-row");
+        if (row) row.classList.toggle("on", cb.checked);
+      })
+    );
+
     const importFile = root.getElementById("import-file");
     if (importFile)
       importFile.addEventListener("change", (ev) => this._onImport(ev.target.files[0]));
@@ -1032,13 +1142,11 @@ class CarManagerPanel extends HTMLElement {
           ? this.shadowRoot.getElementById("f-model-custom").value || ""
           : modelSel.value;
     }
-    // attach default intervals for service items that have data
-    SERVICE_DEFS.forEach((d) => {
-      const s = car.service && car.service[d.key];
-      if (s && (s.last_date || s.last_km != null)) {
-        Object.assign(s, SERVICE_INTERVALS[d.key]);
-      }
-    });
+    // progressive-disclosure sections (bifă → câmpuri)
+    car.legal = this._collectLegal();
+    car.service = this._collectService();
+    car.equipment = this._collectEquipment();
+    car.battery = this._collectBattery();
     return car;
   }
 
@@ -1366,6 +1474,20 @@ class CarManagerPanel extends HTMLElement {
       .svc-label { font-weight:600; min-width:120px; }
       .svc-row input { max-width:160px; }
       .vin-row { display:flex; gap:6px; } .vin-row input { flex:1; min-width:0; }
+
+      .hint { font-size:12px; font-weight:400; color:#9ca3af; margin-left:6px; }
+      .disc-list { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+      .disc-row { border:1px solid #eef2f7; border-radius:12px; padding:10px 14px; transition:border-color .15s, background .15s; }
+      .disc-row.on { border-color:#a5f3fc; background:#f7fdff; }
+      .switch { display:flex; flex-direction:row; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+      .switch input { position:absolute; opacity:0; width:0; height:0; }
+      .switch-track { width:42px; height:24px; border-radius:999px; background:#cbd5e1; position:relative; transition:background .15s; flex-shrink:0; }
+      .switch-thumb { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+      .switch input:checked + .switch-track { background:#0891b2; }
+      .switch input:checked + .switch-track .switch-thumb { transform:translateX(18px); }
+      .switch-label { font-weight:600; font-size:14px; }
+      .disc-body { display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; padding-left:52px; }
+      .disc-body label.inline { color:#475569; }
 
       .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
       .btn { border:1px solid #d1d5db; background:#fff; padding:9px 16px; border-radius:10px; cursor:pointer;

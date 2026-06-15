@@ -197,12 +197,13 @@ def _default_car() -> dict[str, Any]:
         },
         "service": {},
         "equipment": {
-            "trusa_medicala": None,
-            "stingator": None,
+            "trusa_medicala": {"has": False, "expira": None},
+            "stingator": {"has": False, "expira": None},
             "vesta": False,
             "triunghi": False,
         },
         "battery": {
+            "has": False,
             "install_date": None,
             "warranty_months": 48,
         },
