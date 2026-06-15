@@ -150,6 +150,22 @@ async def ws_import_merge(hass, connection, msg):
     connection.send_result(msg["id"], _snapshot(hass))
 
 
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/scan",
+        vol.Required("kind"): str,
+        vol.Required("image"): str,
+        vol.Optional("model"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_scan(hass, connection, msg):
+    from .vision import async_scan
+
+    result = await async_scan(hass, msg["kind"], msg["image"], msg.get("model", ""))
+    connection.send_result(msg["id"], result)
+
+
 @callback
 def async_register_websocket(hass: HomeAssistant) -> None:
     """Register all panel websocket commands once."""
@@ -166,6 +182,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
         ws_delete_cost,
         ws_update_settings,
         ws_import_merge,
+        ws_scan,
     ):
         websocket_api.async_register_command(hass, handler)
     hass.data[DOMAIN]["ws_registered"] = True

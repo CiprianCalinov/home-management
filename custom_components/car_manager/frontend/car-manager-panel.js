@@ -54,6 +54,74 @@ const TABS = [
 
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
+// Listă curată de mărci → modele (focus piața RO). „Altă marcă" / „Alt model"
+// permit scriere liberă pentru ce nu e în listă.
+const CAR_MAKES = {
+  Dacia: ["Logan", "Sandero", "Duster", "Spring", "Jogger", "Lodgy", "Dokker", "Logan MCV"],
+  Volkswagen: ["Golf", "Passat", "Polo", "Tiguan", "Touran", "T-Roc", "T-Cross", "Arteon", "Up", "Caddy", "Sharan", "Jetta"],
+  Skoda: ["Octavia", "Fabia", "Superb", "Kodiaq", "Karoq", "Rapid", "Scala", "Kamiq", "Roomster", "Yeti"],
+  Renault: ["Clio", "Megane", "Captur", "Kadjar", "Scenic", "Laguna", "Talisman", "Koleos", "Twingo", "Espace"],
+  Ford: ["Focus", "Fiesta", "Mondeo", "Kuga", "Puma", "EcoSport", "C-Max", "S-Max", "Galaxy", "Transit"],
+  Opel: ["Astra", "Corsa", "Insignia", "Mokka", "Zafira", "Vectra", "Meriva", "Crossland", "Grandland"],
+  BMW: ["Seria 1", "Seria 2", "Seria 3", "Seria 4", "Seria 5", "Seria 6", "Seria 7", "X1", "X3", "X5", "X6"],
+  "Mercedes-Benz": ["Clasa A", "Clasa B", "Clasa C", "Clasa E", "Clasa S", "GLA", "GLC", "GLE", "CLA", "Vito", "Sprinter"],
+  Audi: ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q2", "Q3", "Q5", "Q7", "Q8"],
+  Toyota: ["Aygo", "Yaris", "Corolla", "Auris", "C-HR", "RAV4", "Avensis", "Camry", "Hilux", "Proace"],
+  Hyundai: ["i10", "i20", "i30", "Tucson", "Kona", "Santa Fe", "ix35", "Accent", "Bayon"],
+  Kia: ["Picanto", "Rio", "Ceed", "Sportage", "Sorento", "Stonic", "Niro", "XCeed"],
+  Peugeot: ["208", "308", "508", "2008", "3008", "5008", "207", "307", "Partner", "Rifter"],
+  "Citroën": ["C1", "C3", "C4", "C5", "Berlingo", "C3 Aircross", "C4 Cactus", "C-Elysée"],
+  Fiat: ["500", "Panda", "Punto", "Tipo", "Doblo", "500X", "500L"],
+  Nissan: ["Micra", "Qashqai", "Juke", "X-Trail", "Note", "Leaf", "Navara"],
+  Honda: ["Civic", "Accord", "CR-V", "Jazz", "HR-V"],
+  Mazda: ["2", "3", "6", "CX-3", "CX-30", "CX-5"],
+  Volvo: ["V40", "V60", "V90", "XC40", "XC60", "XC90", "S60", "S90"],
+  Seat: ["Ibiza", "Leon", "Ateca", "Arona", "Toledo", "Alhambra"],
+  Suzuki: ["Swift", "Vitara", "SX4", "Ignis", "Jimny", "Baleno"],
+  Mitsubishi: ["ASX", "Outlander", "Lancer", "Space Star", "L200"],
+  Chevrolet: ["Spark", "Aveo", "Cruze", "Captiva", "Orlando"],
+  Tesla: ["Model 3", "Model Y", "Model S", "Model X"],
+};
+
+// WMI (primele 3 caractere din VIN) → marcă. Acoperire pentru mărci uzuale în RO.
+const WMI_MAKE = {
+  UU1: "Dacia", UU5: "Dacia", UU6: "Dacia",
+  VF1: "Renault", VF2: "Renault", VF6: "Renault",
+  WVW: "Volkswagen", WV1: "Volkswagen", WV2: "Volkswagen", WVG: "Volkswagen", "1VW": "Volkswagen", "3VW": "Volkswagen",
+  TMB: "Skoda", TMP: "Skoda",
+  WF0: "Ford", "1FA": "Ford", "2FA": "Ford",
+  W0L: "Opel", W0V: "Opel",
+  WBA: "BMW", WBS: "BMW", WBY: "BMW", "4US": "BMW", "5UX": "BMW",
+  WDB: "Mercedes-Benz", WDD: "Mercedes-Benz", WDC: "Mercedes-Benz", WDF: "Mercedes-Benz", W1K: "Mercedes-Benz", W1V: "Mercedes-Benz",
+  WAU: "Audi", WA1: "Audi", TRU: "Audi",
+  VF3: "Peugeot",
+  VF7: "Citroën",
+  ZFA: "Fiat", ZFF: "Fiat",
+  SJN: "Nissan", VSK: "Nissan", JN1: "Nissan",
+  JHM: "Honda", SHH: "Honda", JHL: "Honda",
+  JMZ: "Mazda", JM1: "Mazda",
+  YV1: "Volvo", YV4: "Volvo",
+  VSS: "Seat",
+  TSM: "Suzuki", JSA: "Suzuki",
+  JMB: "Mitsubishi", JMY: "Mitsubishi",
+  TMA: "Hyundai", KMH: "Hyundai", NLH: "Hyundai",
+  KNA: "Kia", KNB: "Kia", KNE: "Kia", U5Y: "Kia", U6Y: "Kia",
+  JTD: "Toyota", JTM: "Toyota", SB1: "Toyota", VNK: "Toyota", NMT: "Toyota",
+  "5YJ": "Tesla", "7SA": "Tesla", LRW: "Tesla",
+};
+
+// Caracterul 10 din VIN = anul modelului (ciclu de 30 ani, fără I,O,Q,U,Z,0).
+const VIN_YEAR_CODES = "ABCDEFGHJKLMNPRSTVWXY123456789";
+function vinModelYear(ch) {
+  if (!ch) return null;
+  const i = VIN_YEAR_CODES.indexOf(String(ch).toUpperCase());
+  if (i < 0) return null;
+  const now = new Date().getFullYear();
+  let y = 1980 + i;
+  while (y + 30 <= now + 1) y += 30;
+  return y;
+}
+
 const fmtRon = (n) =>
   `${Number(n || 0).toLocaleString("ro-RO", { maximumFractionDigits: 0 })} RON`;
 const esc = (s) =>
@@ -353,14 +421,9 @@ class CarManagerPanel extends HTMLElement {
         <h2>${isNew ? "Autovehicul nou" : esc(e.name || "Autovehicul")}</h2>
 
         <h3>Date generale</h3>
-        <div class="form-grid">
-          <label>Nume<input data-f="name" value="${esc(e.name || "")}" placeholder="ex. Logan"></label>
-          <label>Marcă<input data-f="make" value="${esc(e.make || "")}" placeholder="Dacia"></label>
-          <label>Model<input data-f="model" value="${esc(e.model || "")}" placeholder="Logan"></label>
-          <label>Nr. înmatriculare<input data-f="plate" value="${esc(e.plate || "")}" placeholder="B 123 ABC"></label>
-          <label>VIN<input data-f="vin" value="${esc(e.vin || "")}"></label>
-          <label>An<input type="number" data-f="year" value="${e.year ?? ""}"></label>
-          <label>Kilometraj<input type="number" data-f="mileage" value="${e.mileage ?? ""}"></label>
+        ${this._identityGrid(e)}
+        <div class="form-actions" style="justify-content:flex-start">
+          <button class="btn" type="button" data-action="scan-talon">📷 Scanează talonul</button>
         </div>
 
         <h3>Termene legale</h3>
@@ -427,6 +490,74 @@ class CarManagerPanel extends HTMLElement {
       </section>`;
   }
 
+  _identityGrid(e) {
+    const make = e.make || "";
+    const model = e.model || "";
+    const makeKnown = Object.prototype.hasOwnProperty.call(CAR_MAKES, make);
+    const makeOther = make !== "" && !makeKnown;
+    const makeOpts =
+      `<option value="">— alege —</option>` +
+      Object.keys(CAR_MAKES)
+        .map((k) => `<option value="${esc(k)}" ${k === make ? "selected" : ""}>${esc(k)}</option>`)
+        .join("") +
+      `<option value="__other__" ${makeOther ? "selected" : ""}>Altă marcă…</option>`;
+    const models = makeKnown ? CAR_MAKES[make] : [];
+    const modelOther = model !== "" && !models.includes(model);
+    const modelOpts =
+      `<option value="">— alege —</option>` +
+      models.map((m) => `<option ${m === model ? "selected" : ""}>${esc(m)}</option>`).join("") +
+      `<option value="__other__" ${modelOther ? "selected" : ""}>Alt model…</option>`;
+
+    return `
+      <div class="form-grid">
+        <label>Nume<input data-f="name" value="${esc(e.name || "")}" placeholder="ex. Logan"></label>
+        <label>Marcă<select id="f-make-select">${makeOpts}</select></label>
+        <label id="f-make-custom-wrap" style="display:${makeOther ? "" : "none"}">Marcă (scrie)
+          <input id="f-make-custom" value="${makeOther ? esc(make) : ""}" placeholder="ex. Lada"></label>
+        <label>Model<select id="f-model-select">${modelOpts}</select></label>
+        <label id="f-model-custom-wrap" style="display:${modelOther ? "" : "none"}">Model (scrie)
+          <input id="f-model-custom" value="${modelOther ? esc(model) : ""}" placeholder="ex. Niva"></label>
+        <label>Nr. înmatriculare<input data-f="plate" value="${esc(e.plate || "")}" placeholder="B 123 ABC"></label>
+        <label>VIN (serie șasiu)
+          <span class="vin-row">
+            <input data-f="vin" id="f-vin" value="${esc(e.vin || "")}" placeholder="17 caractere" maxlength="17">
+            <button class="btn" type="button" data-action="decode-vin">Decodează</button>
+          </span>
+        </label>
+        <label>An<input type="number" data-f="year" id="f-year" value="${e.year ?? ""}"></label>
+        <label>Kilometraj<input type="number" data-f="mileage" value="${e.mileage ?? ""}"></label>
+      </div>`;
+  }
+
+  _decodeVin() {
+    const vinEl = this.shadowRoot.getElementById("f-vin");
+    const vin = (vinEl.value || "").trim().toUpperCase();
+    vinEl.value = vin;
+    if (vin.length !== 17) {
+      this._toast("VIN-ul trebuie să aibă exact 17 caractere.");
+      return;
+    }
+    const make = WMI_MAKE[vin.slice(0, 3)] || null;
+    const year = vinModelYear(vin[9]);
+    if (make) {
+      const makeSel = this.shadowRoot.getElementById("f-make-select");
+      makeSel.value = Object.prototype.hasOwnProperty.call(CAR_MAKES, make) ? make : "__other__";
+      makeSel.dispatchEvent(new Event("change"));
+      if (makeSel.value === "__other__") {
+        this.shadowRoot.getElementById("f-make-custom").value = make;
+      }
+    }
+    if (year) this.shadowRoot.getElementById("f-year").value = year;
+    const parts = [];
+    if (make) parts.push(make);
+    if (year) parts.push(year);
+    this._toast(
+      parts.length
+        ? `Din VIN: ${parts.join(", ")}. Alege modelul din listă.`
+        : "Nu am putut decoda marca/anul din acest VIN."
+    );
+  }
+
   _editingRaw() {
     if (!this._editing || !this._editing.id) return null;
     return (this._data.raw.cars || {})[this._editing.id] || null;
@@ -461,7 +592,10 @@ class CarManagerPanel extends HTMLElement {
           <label>Sumă (RON)<input type="number" id="cost-amount" step="0.01"></label>
           <label>Notă<input id="cost-note"></label>
         </div>
-        <div class="form-actions"><button class="btn primary" data-action="add-cost">Adaugă</button></div>
+        <div class="form-actions">
+          <button class="btn" data-action="scan-cost">📷 Scanează bon</button>
+          <button class="btn primary" data-action="add-cost">Adaugă</button>
+        </div>
       </section>
 
       <section class="card">
@@ -548,7 +682,10 @@ class CarManagerPanel extends HTMLElement {
           <label>Km bord<input type="number" id="fuel-odo"></label>
           <label class="check"><input type="checkbox" id="fuel-full" checked> Plin</label>
         </div>
-        <div class="form-actions"><button class="btn primary" data-action="add-fuel">Adaugă bon</button></div>
+        <div class="form-actions">
+          <button class="btn" data-action="scan-fuel">📷 Scanează bon</button>
+          <button class="btn primary" data-action="add-fuel">Adaugă bon</button>
+        </div>
       </section>
 
       <section class="card">
@@ -674,7 +811,13 @@ class CarManagerPanel extends HTMLElement {
           <label>Serviciu notificare<input id="set-service" value="${esc(
             s.notify_service || ""
           )}" placeholder="notify.mobile_app_telefon"></label>
+          <label>Model Gemini (scanare poze)<input id="set-gemini" value="${esc(
+            s.gemini_model || ""
+          )}" placeholder="auto (din integrarea Google AI)"></label>
         </div>
+        <p class="muted small">Scanarea pozelor (bonuri, talon) folosește integrarea ta
+        <b>Google Generative AI (Gemini)</b> din HA — nu e nevoie de altă cheie. Lasă
+        modelul gol pentru a-l prelua automat, sau scrie unul (ex. <code>gemini-2.0-flash</code>).</p>
         <div class="form-actions"><button class="btn primary" data-action="save-settings">Salvează setări</button></div>
       </section>
 
@@ -753,6 +896,26 @@ class CarManagerPanel extends HTMLElement {
     const importFile = root.getElementById("import-file");
     if (importFile)
       importFile.addEventListener("change", (ev) => this._onImport(ev.target.files[0]));
+
+    const makeSel = root.getElementById("f-make-select");
+    if (makeSel) {
+      const modelSel = root.getElementById("f-model-select");
+      const makeWrap = root.getElementById("f-make-custom-wrap");
+      const modelWrap = root.getElementById("f-model-custom-wrap");
+      makeSel.addEventListener("change", () => {
+        const mk = makeSel.value;
+        makeWrap.style.display = mk === "__other__" ? "" : "none";
+        const models = CAR_MAKES[mk] || [];
+        modelSel.innerHTML =
+          `<option value="">— alege —</option>` +
+          models.map((m) => `<option>${esc(m)}</option>`).join("") +
+          `<option value="__other__">Alt model…</option>`;
+        modelWrap.style.display = mk === "__other__" ? "" : "none";
+      });
+      modelSel.addEventListener("change", () => {
+        modelWrap.style.display = modelSel.value === "__other__" ? "" : "none";
+      });
+    }
   }
 
   _onAction(action, el) {
@@ -779,6 +942,18 @@ class CarManagerPanel extends HTMLElement {
         break;
       case "save-car":
         this._saveCar();
+        break;
+      case "decode-vin":
+        this._decodeVin();
+        break;
+      case "scan-fuel":
+        this._scan("fuel");
+        break;
+      case "scan-cost":
+        this._scan("cost");
+        break;
+      case "scan-talon":
+        this._scan("talon");
         break;
       case "add-cost":
         this._addCost();
@@ -819,6 +994,18 @@ class CarManagerPanel extends HTMLElement {
       }
       obj[path[path.length - 1]] = val;
     });
+    const makeSel = this.shadowRoot.getElementById("f-make-select");
+    if (makeSel) {
+      car.make =
+        makeSel.value === "__other__"
+          ? this.shadowRoot.getElementById("f-make-custom").value || ""
+          : makeSel.value;
+      const modelSel = this.shadowRoot.getElementById("f-model-select");
+      car.model =
+        modelSel.value === "__other__"
+          ? this.shadowRoot.getElementById("f-model-custom").value || ""
+          : modelSel.value;
+    }
     // attach default intervals for service items that have data
     SERVICE_DEFS.forEach((d) => {
       const s = car.service && car.service[d.key];
@@ -902,8 +1089,138 @@ class CarManagerPanel extends HTMLElement {
         notify_enabled: g("set-enabled").checked,
         notify_days: days.length ? days : [30, 7, 1],
         notify_service: g("set-service").value,
+        gemini_model: g("set-gemini").value,
       },
     });
+  }
+
+  // ----------------------------------------------------------- scanare poză
+  _pickImage() {
+    return new Promise((resolve) => {
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = "image/*";
+      inp.capture = "environment";
+      inp.style.display = "none";
+      inp.addEventListener("change", () =>
+        resolve(inp.files && inp.files[0] ? inp.files[0] : null)
+      );
+      inp.click();
+    });
+  }
+
+  _scaleImage(file, max = 1280, quality = 0.72) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (Math.max(w, h) > max) {
+          const r = max / Math.max(w, h);
+          w = Math.round(w * r);
+          h = Math.round(h * r);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+      img.src = url;
+    });
+  }
+
+  async _scan(kind) {
+    const file = await this._pickImage();
+    if (!file) return;
+    this._toast("Se scanează poza cu Gemini…");
+    let image;
+    try {
+      image = await this._scaleImage(file);
+    } catch (err) {
+      this._toast(`Nu am putut citi imaginea: ${err}`);
+      return;
+    }
+    const model = (this._data.raw.settings || {}).gemini_model || "";
+    let res;
+    try {
+      res = await this._call("scan", { kind, image, model });
+    } catch (err) {
+      this._toast(`Eroare scanare: ${err}`);
+      return;
+    }
+    if (!res || !res.ok) {
+      this._toast(res && res.error ? res.error : "Scanarea a eșuat.");
+      return;
+    }
+    const d = res.data || {};
+    if (kind === "fuel") this._applyFuel(d);
+    else if (kind === "cost") this._applyCost(d);
+    else if (kind === "talon") this._applyTalon(d);
+  }
+
+  _setField(id, value) {
+    const el = this.shadowRoot.getElementById(id);
+    if (el && value !== null && value !== undefined && value !== "") el.value = value;
+  }
+
+  _applyFuel(d) {
+    this._setField("fuel-date", d.date);
+    this._setField("fuel-liters", d.liters);
+    this._setField("fuel-price", d.price_total);
+    this._setField("fuel-odo", d.odometer);
+    this._toast("Date completate din bon. Verifică și apasă Adaugă bon.");
+  }
+
+  _applyCost(d) {
+    this._setField("cost-date", d.date);
+    this._setField("cost-amount", d.amount);
+    this._setField("cost-note", d.note);
+    if (d.category) {
+      const sel = this.shadowRoot.getElementById("cost-cat");
+      const opt = [...sel.options].find((o) => o.value === String(d.category).toLowerCase());
+      if (opt) sel.value = opt.value;
+    }
+    this._toast("Date completate din document. Verifică și apasă Adaugă.");
+  }
+
+  _applyTalon(d) {
+    this._setMakeModel(d.make, d.model);
+    this._setField("f-year", d.year);
+    this._setField("f-vin", d.vin ? String(d.vin).toUpperCase() : "");
+    const plate = this.shadowRoot.querySelector('[data-f="plate"]');
+    if (plate && d.plate) plate.value = d.plate;
+    this._toast("Date completate din talon. Verifică și apasă Salvează.");
+  }
+
+  _setMakeModel(make, model) {
+    if (make) {
+      const ms = this.shadowRoot.getElementById("f-make-select");
+      if (ms) {
+        ms.value = Object.prototype.hasOwnProperty.call(CAR_MAKES, make) ? make : "__other__";
+        ms.dispatchEvent(new Event("change"));
+        if (ms.value === "__other__")
+          this.shadowRoot.getElementById("f-make-custom").value = make;
+      }
+    }
+    if (model) {
+      const md = this.shadowRoot.getElementById("f-model-select");
+      if (md) {
+        const opt = [...md.options].find(
+          (o) => o.value.toLowerCase() === String(model).toLowerCase()
+        );
+        md.value = opt ? opt.value : "__other__";
+        md.dispatchEvent(new Event("change"));
+        if (md.value === "__other__")
+          this.shadowRoot.getElementById("f-model-custom").value = model;
+      }
+    }
   }
 
   _export() {
@@ -1015,6 +1332,7 @@ class CarManagerPanel extends HTMLElement {
         border-radius:10px; padding:8px 12px; }
       .svc-label { font-weight:600; min-width:120px; }
       .svc-row input { max-width:160px; }
+      .vin-row { display:flex; gap:6px; } .vin-row input { flex:1; min-width:0; }
 
       .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
       .btn { border:1px solid #d1d5db; background:#fff; padding:9px 16px; border-radius:10px; cursor:pointer;

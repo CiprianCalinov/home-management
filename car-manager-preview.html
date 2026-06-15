@@ -180,6 +180,16 @@
       delete_cost: (m) => { raw.costs = raw.costs.filter((c) => c.id !== m.entry_id); return snapshot(); },
       update_settings: (m) => { Object.assign(raw.settings, m.settings); return snapshot(); },
       import_merge: () => snapshot(),
+      // Scanarea returnează date demo fixe (nu citește efectiv poza în preview).
+      scan: (m) => {
+        const today = new Date().toISOString().slice(0, 10);
+        const demo = {
+          fuel: { date: today, liters: 42.3, price_total: 325.5, odometer: null, fuel_type: "motorină", station: "OMV" },
+          cost: { date: today, amount: 450, category: "service", note: "Schimb ulei + filtre" },
+          talon: { plate: "B 123 ABC", make: "Dacia", model: "Logan", vin: "UU1ABCDEFGH123456", year: 2018 },
+        };
+        return { ok: true, kind: m.kind, model: "preview-mock", data: demo[m.kind] || {} };
+      },
     };
 
     const hass = {

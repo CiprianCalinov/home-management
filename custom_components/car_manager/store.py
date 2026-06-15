@@ -29,6 +29,7 @@ def _empty_data() -> dict[str, Any]:
             "notify_enabled": True,
             "notify_days": [30, 7, 1],
             "notify_service": "",
+            "gemini_model": "",
         },
     }
 

@@ -9,6 +9,19 @@ dedicat în bara laterală**, plus senzori pe care îi poți folosi în automati
 > licențe și fără dependență de portaluri externe. Rovinieta/RCA/ITP se
 > introduc manual și primești remindere.
 
+## Noutăți v0.3.0
+
+- **Marcă & model din dropdown** (listă curată axată pe piața RO) cu opțiune de
+  scriere liberă pentru ce nu e în listă.
+- **Decodare VIN** (offline, în panou): din VIN se completează automat marca și
+  anul; modelul îl alegi din listă.
+- **📷 Scanare cu camera (Gemini)**: fă o poză la bonul de la benzinărie, la o
+  factură/chitanță sau la talon, iar datele se completează automat în formular.
+  Folosește integrarea ta **Google Generative AI (Gemini)** deja configurată în
+  HA — fără cheie API suplimentară, fără setări în `configuration.yaml`. Poza nu
+  se salvează pe disc; e trimisă direct către Gemini și se păstrează doar textul
+  extras. Revizuiești datele și apeși „Adaugă/Salvează".
+
 ## Ce conține
 
 - **Panou lateral** „Car Manager" cu tab-urile: Acasă, Mașini, Costuri,
