@@ -8,6 +8,7 @@ import os
 from homeassistant.components import frontend, panel_custom
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.loader import async_get_integration
 
 from .const import (
     DOMAIN,
@@ -76,15 +77,20 @@ async def _async_register_frontend(hass: HomeAssistant, domain_data: dict) -> No
             _LOGGER.debug("Static path already registered: %s", err)
         hass.data["_car_manager_static_done"] = True
 
+    # Cache-bust the panel module by version so browsers fetch the new file
+    # after every update instead of serving a stale cached copy.
+    integration = await async_get_integration(hass, DOMAIN)
+    version = str(integration.version or "0")
+
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name="car-manager-panel",
-        module_url=f"{PANEL_FILES_URL}/{PANEL_JS_FILE}",
+        module_url=f"{PANEL_FILES_URL}/{PANEL_JS_FILE}?v={version}",
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         require_admin=False,
-        config={},
+        config={"version": version},
         embed_iframe=False,
     )
     domain_data["frontend_registered"] = True

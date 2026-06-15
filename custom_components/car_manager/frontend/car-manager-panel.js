@@ -54,6 +54,9 @@ const TABS = [
 
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
+// Fallback dacă panoul nu primește versiunea din config (ex. în preview).
+const PANEL_VERSION = "0.3.1";
+
 // Listă curată de mărci → modele (focus piața RO). „Altă marcă" / „Alt model"
 // permit scriere liberă pentru ce nu e în listă.
 const CAR_MAKES = {
@@ -152,6 +155,18 @@ class CarManagerPanel extends HTMLElement {
     return this._hass;
   }
 
+  set panel(p) {
+    this._panel = p;
+  }
+
+  get panel() {
+    return this._panel;
+  }
+
+  _version() {
+    return (this._panel && this._panel.config && this._panel.config.version) || PANEL_VERSION;
+  }
+
   async _call(type, payload = {}) {
     return this._hass.connection.sendMessagePromise({
       type: `car_manager/${type}`,
@@ -221,7 +236,7 @@ class CarManagerPanel extends HTMLElement {
             <div class="brand">CAR MANAGER</div>
             <h1>Car Manager</h1>
             <p>Administrare auto într-un singur loc: termene legale, revizii, costuri, consum, anvelope, dotări și baterie.</p>
-            <div class="badge">HA · LOCAL · v0.1.0</div>
+            <div class="badge">HA · LOCAL · v${esc(this._version())}</div>
           </div>
         </div>
         <div class="stats">
