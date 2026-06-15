@@ -41,21 +41,44 @@ const COST_CATEGORIES = [
 ];
 
 const TABS = [
-  ["acasa", "Acasă", "🏠"],
-  ["masini", "Mașini", "🚗"],
-  ["costuri", "Costuri", "💳"],
-  ["statistici", "Statistici", "📈"],
-  ["combustibil", "Combustibil", "⛽"],
-  ["anvelope", "Anvelope", "🛞"],
-  ["dotari", "Dotări", "🧰"],
-  ["baterie", "Baterie", "🔋"],
-  ["setari", "Setări", "⚙️"],
+  ["acasa", "Acasă", "home"],
+  ["masini", "Mașini", "car"],
+  ["costuri", "Costuri", "wallet"],
+  ["statistici", "Statistici", "chart"],
+  ["combustibil", "Combustibil", "fuel"],
+  ["anvelope", "Anvelope", "tire"],
+  ["dotari", "Dotări", "kit"],
+  ["baterie", "Baterie", "battery"],
+  ["setari", "Setări", "settings"],
 ];
 
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.3.3";
+const PANEL_VERSION = "0.4.0";
+
+// Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
+const ICONS = {
+  home: '<path d="M3 11.4 12 4l9 7.4"/><path d="M5.5 10v9.5h13V10"/>',
+  car: '<path d="M5 11l1.7-4.3A2 2 0 0 1 8.6 5.4h6.8a2 2 0 0 1 1.9 1.3L19 11"/><rect x="3.5" y="11" width="17" height="5.5" rx="1.5"/><circle cx="7.6" cy="16.6" r="1.6"/><circle cx="16.4" cy="16.6" r="1.6"/>',
+  wallet: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><circle cx="16.5" cy="14.2" r="1.2"/>',
+  chart: '<path d="M4 4v16h16"/><path d="M8 16v-4"/><path d="M12 16V9"/><path d="M16 16v-6"/>',
+  fuel: '<path d="M6.5 20V6.5A2.5 2.5 0 0 1 9 4h3a2.5 2.5 0 0 1 2.5 2.5V20"/><path d="M5 20h11"/><path d="M8.5 9.5h4"/><path d="M14.5 8l2.6 2.2v6.3a1.45 1.45 0 0 0 2.9 0V11l-2-2"/>',
+  tire: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21"/>',
+  kit: '<rect x="3" y="7" width="18" height="12.5" rx="2.5"/><path d="M9 7V5.6A1.6 1.6 0 0 1 10.6 4h2.8A1.6 1.6 0 0 1 15 5.6V7"/><path d="M12 11v4.5M9.75 13.25h4.5"/>',
+  battery: '<rect x="2.5" y="8" width="16" height="9" rx="2.5"/><path d="M21 11v3"/><path d="M6.5 11v3M10 11v3M13.5 11v3"/>',
+  settings: '<path d="M4 7h8M16 7h4"/><path d="M4 12h2M10 12h10"/><path d="M4 17h6M14 17h6"/><circle cx="14" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="12" cy="17" r="2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  edit: '<path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17l-1 3z"/><path d="M14 7.5l2.8 2.8"/>',
+  trash: '<path d="M4 7h16"/><path d="M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7"/><path d="M6.5 7l1 12.3a1.2 1.2 0 0 0 1.2 1.1h6.6a1.2 1.2 0 0 0 1.2-1.1L18.5 7"/>',
+  camera: '<path d="M4 9.5a2 2 0 0 1 2-2h1.6L9 5.5h6l1.4 2H18a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.2" r="3.2"/>',
+  shield: '<path d="M12 3.2l7 2.8v5c0 4.4-3 7.5-7 9-4-1.5-7-4.6-7-9V6z"/><path d="M9 12l2.2 2.2L15.2 10"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.2"/><path d="M12 16.3h.02"/>',
+  check: '<path d="M5 12.5l4.2 4.2L19 7"/>',
+};
+function icon(name, size = 20) {
+  return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
 
 // Listă curată de mărci → modele (focus piața RO). „Altă marcă" / „Alt model"
 // permit scriere liberă pentru ce nu e în listă.
@@ -231,7 +254,7 @@ class CarManagerPanel extends HTMLElement {
     return `
       <div class="banner">
         <div class="banner-main">
-          <div class="logo">🚗</div>
+          <div class="logo">${icon("car", 34)}</div>
           <div class="banner-text">
             <div class="brand">CAR MANAGER</div>
             <h1>Car Manager</h1>
@@ -256,10 +279,10 @@ class CarManagerPanel extends HTMLElement {
 
   _tabbar() {
     return `<nav class="tabs">${TABS.map(
-      ([id, label, icon]) =>
+      ([id, label, ic]) =>
         `<button data-tab="${id}" class="tab ${
           this._tab === id ? "active" : ""
-        }"><span>${icon}</span>${label}</button>`
+        }">${icon(ic, 22)}<span>${label}</span></button>`
     ).join("")}</nav>`;
   }
 
@@ -316,7 +339,7 @@ class CarManagerPanel extends HTMLElement {
       <section class="card">
         <div class="row-between">
           <div class="overline">AUTOVEHICULE</div>
-          <button class="btn primary" data-action="add-car">+ Adaugă autovehicul</button>
+          <button class="btn primary" data-action="add-car">${icon("plus", 16)} Adaugă autovehicul</button>
         </div>
         <div class="car-grid">
           ${cars.map((c) => this._carCard(c)).join("")}
@@ -364,10 +387,10 @@ class CarManagerPanel extends HTMLElement {
     return `
       <div class="car">
         <div class="row-between">
-          <div class="car-name">🚘 ${esc(c.name)}</div>
+          <div class="car-name">${icon("car", 18)} ${esc(c.name)}</div>
           <div class="car-actions">
-            <button class="icon-btn" data-action="edit-car" data-id="${c.id}" title="Editează">✏️</button>
-            <button class="icon-btn" data-action="del-car" data-id="${c.id}" title="Șterge">🗑️</button>
+            <button class="icon-btn" data-action="edit-car" data-id="${c.id}" title="Editează">${icon("edit", 16)}</button>
+            <button class="icon-btn" data-action="del-car" data-id="${c.id}" title="Șterge">${icon("trash", 16)}</button>
           </div>
         </div>
         <div class="muted small">${esc(c.make || "")} ${esc(c.model || "")} · ${
@@ -385,7 +408,7 @@ class CarManagerPanel extends HTMLElement {
       <section class="card">
         <div class="row-between">
           <div><div class="overline">MAȘINI</div><h2>Autovehiculele tale</h2></div>
-          <button class="btn primary" data-action="add-car">+ Adaugă autovehicul</button>
+          <button class="btn primary" data-action="add-car">${icon("plus", 16)} Adaugă autovehicul</button>
         </div>
         ${
           cars.length
@@ -412,7 +435,7 @@ class CarManagerPanel extends HTMLElement {
         <h3>Date generale</h3>
         ${this._identityGrid(e)}
         <div class="form-actions" style="justify-content:flex-start">
-          <button class="btn" type="button" data-action="scan-talon">📷 Scanează talonul</button>
+          <button class="btn" type="button" data-action="scan-talon">${icon("camera", 16)} Scanează talonul</button>
         </div>
 
         <h3>Termene legale <span class="hint">bifează ce are mașina</span></h3>
@@ -714,7 +737,7 @@ class CarManagerPanel extends HTMLElement {
           <label>Notă<input id="cost-note"></label>
         </div>
         <div class="form-actions">
-          <button class="btn" data-action="scan-cost">📷 Scanează bon</button>
+          <button class="btn" data-action="scan-cost">${icon("camera", 16)} Scanează bon</button>
           <button class="btn primary" data-action="add-cost">Adaugă</button>
         </div>
       </section>
@@ -731,7 +754,7 @@ class CarManagerPanel extends HTMLElement {
             <td>${esc(c.category)}</td>
             <td>${fmtRon(c.amount)}</td>
             <td>${esc(c.note || "")}</td>
-            <td><button class="icon-btn" data-action="del-cost" data-id="${c.id}">🗑️</button></td>
+            <td><button class="icon-btn" data-action="del-cost" data-id="${c.id}">${icon("trash", 16)}</button></td>
           </tr>`
                 )
                 .join("")}</tbody></table>`
@@ -804,7 +827,7 @@ class CarManagerPanel extends HTMLElement {
           <label class="check"><input type="checkbox" id="fuel-full" checked> Plin</label>
         </div>
         <div class="form-actions">
-          <button class="btn" data-action="scan-fuel">📷 Scanează bon</button>
+          <button class="btn" data-action="scan-fuel">${icon("camera", 16)} Scanează bon</button>
           <button class="btn primary" data-action="add-fuel">Adaugă bon</button>
         </div>
       </section>
@@ -822,7 +845,7 @@ class CarManagerPanel extends HTMLElement {
             <td>${fmtRon(f.price_total)}</td>
             <td>${f.odometer ? f.odometer.toLocaleString("ro-RO") : "—"}</td>
             <td>${f.full ? "✅" : "—"}</td>
-            <td><button class="icon-btn" data-action="del-fuel" data-id="${f.id}">🗑️</button></td>
+            <td><button class="icon-btn" data-action="del-fuel" data-id="${f.id}">${icon("trash", 16)}</button></td>
           </tr>`
                 )
                 .join("")}</tbody></table>`
@@ -841,7 +864,7 @@ class CarManagerPanel extends HTMLElement {
         .map((c) => {
           const t = c.tires || {};
           return `<div class="car">
-          <div class="car-name">🛞 ${esc(c.name)}</div>
+          <div class="car-name">${icon("tire", 18)} ${esc(c.name)}</div>
           <div class="form-grid">
             <label>Sezon<select id="tire-${c.id}-season">
               ${TIRE_SEASONS.map(
@@ -884,7 +907,7 @@ class CarManagerPanel extends HTMLElement {
           const trusa = this._eqDate(eq.trusa_medicala);
           const sting = this._eqDate(eq.stingator);
           return `<div class="car">
-          <div class="row-between"><div class="car-name">🚘 ${esc(c.name)}</div>
+          <div class="row-between"><div class="car-name">${icon("car", 18)} ${esc(c.name)}</div>
           <button class="btn" data-action="edit-car" data-id="${c.id}">Editează</button></div>
           <div class="tags">
             ${tag("Trusă medicală", trusa.has, trusa.expira ? "exp. " + trusa.expira : "")}
@@ -913,7 +936,7 @@ class CarManagerPanel extends HTMLElement {
             const days = Math.round((end - new Date()) / 86400000);
             info = `montată ${b.install_date}, garanție expiră în ~${days} zile`;
           }
-          return `<div class="car"><div class="row-between"><div class="car-name">🔋 ${esc(
+          return `<div class="car"><div class="row-between"><div class="car-name">${icon("battery", 18)} ${esc(
             c.name
           )}</div><button class="btn" data-action="edit-car" data-id="${c.id}">Editează</button></div>
           <div class="muted small">${esc(info)}</div></div>`;
@@ -967,10 +990,10 @@ class CarManagerPanel extends HTMLElement {
 
   _emptyState() {
     return `<div class="empty">
-      <div class="empty-icon">🚗</div>
+      <div class="empty-icon">${icon("car", 46)}</div>
       <h3>Nicio mașină încă</h3>
       <p class="muted">Adaugă primul autovehicul ca să urmărești termene, revizii și costuri.</p>
-      <button class="btn primary" data-action="add-car">+ Adaugă autovehicul</button>
+      <button class="btn primary" data-action="add-car">${icon("plus", 16)} Adaugă autovehicul</button>
     </div>`;
   }
 
@@ -1390,125 +1413,178 @@ class CarManagerPanel extends HTMLElement {
   // ----------------------------------------------------------- styles
   _styles() {
     return `<style>
-      :host { display:block; background:#f3f5f8; min-height:100%; color:#1f2937;
-        font-family: var(--paper-font-body1_-_font-family, "Roboto", system-ui, sans-serif); }
-      .wrap { max-width:1200px; margin:0 auto; padding:16px; box-sizing:border-box; }
-      .loading { padding:48px; text-align:center; color:#6b7280; }
-      h1,h2,h3 { margin:0 0 8px; }
-      h2 { font-size:22px; } h3 { font-size:16px; margin-top:18px; }
-      .muted { color:#6b7280; } .small { font-size:13px; }
-      .overline { font-size:11px; letter-spacing:.08em; color:#9ca3af; font-weight:700; }
+      :host {
+        --bg:#0a0f16; --bg-soft:#0e1520;
+        --surface:rgba(255,255,255,.045); --surface-2:rgba(255,255,255,.03); --surface-solid:#121a25;
+        --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.16);
+        --text:#e8eef5; --text-dim:#a4b3c2; --muted:#7e8c9b;
+        --accent:#a3e635; --accent-2:#bef264; --on-accent:#0a0f16;
+        --ok:#4ade80; --warn:#fbbf24; --danger:#fb7185;
+        --shadow:0 14px 40px rgba(0,0,0,.45); --shadow-sm:0 4px 16px rgba(0,0,0,.3);
+        --r:20px; --r-sm:13px;
+        display:block; min-height:100%; color:var(--text);
+        background:
+          radial-gradient(90% 50% at 50% -8%, rgba(163,230,53,.07), transparent 70%),
+          var(--bg);
+        font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+        -webkit-font-smoothing:antialiased;
+      }
+      @media (prefers-color-scheme: light) {
+        :host {
+          --bg:#eef3ea; --bg-soft:#f6f9f4;
+          --surface:#ffffff; --surface-2:#f5f8f2; --surface-solid:#ffffff;
+          --border:#e3ebdd; --border-2:#d3ddcb;
+          --text:#121a13; --text-dim:#46554a; --muted:#6a7a6c;
+          --accent:#4d7c0f; --accent-2:#65a30d; --on-accent:#ffffff;
+          --ok:#16a34a; --warn:#d97706; --danger:#e11d48;
+          --shadow:0 12px 30px rgba(30,50,15,.12); --shadow-sm:0 4px 14px rgba(30,50,15,.08);
+        }
+      }
+      * { box-sizing:border-box; }
+      .ic { display:inline-block; vertical-align:middle; flex-shrink:0; }
+      .wrap { max-width:1180px; margin:0 auto; padding:18px 16px 30px; }
+      .loading { padding:64px; text-align:center; color:var(--muted); }
+      h1,h2,h3 { margin:0 0 8px; letter-spacing:-.01em; }
+      h2 { font-size:22px; font-weight:750; } h3 { font-size:15px; margin-top:20px; font-weight:700; }
+      .muted { color:var(--muted); } .small { font-size:13px; }
+      .overline { font-size:11px; letter-spacing:.14em; color:var(--muted); font-weight:800; text-transform:uppercase; }
       .row-between { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
 
-      .banner { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
-        background:radial-gradient(120% 140% at 80% 0%,#22d3ee 0%,#0891b2 45%,#0e7490 100%); color:#fff;
-        border-radius:24px; padding:26px 28px; box-shadow:0 14px 40px rgba(8,145,178,.30);
-        position:relative; overflow:hidden; }
-      .banner::after { content:"🚗"; position:absolute; right:240px; bottom:-30px; font-size:160px;
-        opacity:.12; transform:rotate(-8deg); pointer-events:none; }
+      .banner { position:relative; overflow:hidden; display:flex; justify-content:space-between; gap:22px;
+        flex-wrap:wrap; border-radius:26px; padding:28px 30px; color:#eafff0;
+        background:
+          radial-gradient(70% 130% at 88% -20%, rgba(163,230,53,.40), transparent 58%),
+          radial-gradient(60% 120% at 10% 120%, rgba(34,197,94,.18), transparent 60%),
+          linear-gradient(135deg,#0c1b11 0%,#0c2417 45%,#080d13 100%);
+        box-shadow:0 20px 50px rgba(0,0,0,.45); border:1px solid rgba(163,230,53,.16); }
       .banner-main { display:flex; gap:18px; align-items:flex-start; z-index:1; }
-      .logo { font-size:38px; background:rgba(255,255,255,.18); width:66px; height:66px;
-        border-radius:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-      .brand { font-size:11px; letter-spacing:.18em; font-weight:800; opacity:.85; }
-      .banner h1 { font-size:30px; font-weight:800; margin:2px 0 0; }
-      .banner p { margin:6px 0 0; max-width:520px; opacity:.92; font-size:13px; }
-      .badge { display:inline-block; margin-top:12px; font-size:11px; font-weight:700; letter-spacing:.06em;
-        background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.25);
-        padding:5px 12px; border-radius:999px; }
-      .stats { display:flex; flex-direction:column; gap:10px; min-width:180px; z-index:1; }
-      .stat { background:#fff; color:#0f172a; border-radius:14px; padding:10px 16px;
-        box-shadow:0 4px 14px rgba(0,0,0,.12); display:flex; flex-direction:column; }
-      .stat-label { font-size:11px; color:#64748b; }
-      .stat-sub { font-size:11px; color:#64748b; order:2; }
-      .stat-val { font-size:22px; font-weight:800; order:1; }
-      .stat-val.ok { color:#059669; } .stat-val.warn { color:#d97706; }
+      .logo { color:var(--accent); width:64px; height:64px; border-radius:18px; display:flex;
+        align-items:center; justify-content:center; flex-shrink:0;
+        background:rgba(163,230,53,.12); border:1px solid rgba(163,230,53,.28);
+        box-shadow:0 0 28px rgba(163,230,53,.22) inset; }
+      .brand { font-size:11px; letter-spacing:.24em; font-weight:800; color:rgba(190,242,100,.9); }
+      .banner h1 { font-size:30px; font-weight:820; margin:3px 0 0; color:#fff; }
+      .banner p { margin:7px 0 0; max-width:520px; color:rgba(220,240,225,.78); font-size:13px; line-height:1.5; }
+      .badge { display:inline-block; margin-top:13px; font-size:11px; font-weight:700; letter-spacing:.08em;
+        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); color:#cdebd2;
+        padding:5px 13px; border-radius:999px; backdrop-filter:blur(6px); }
+      .stats { display:flex; flex-direction:column; gap:9px; min-width:180px; z-index:1; }
+      .stat { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); color:#fff;
+        border-radius:15px; padding:10px 16px; display:flex; flex-direction:column; backdrop-filter:blur(10px); }
+      .stat-label { font-size:11px; color:rgba(220,240,225,.7); }
+      .stat-sub { font-size:11px; color:rgba(220,240,225,.7); order:2; }
+      .stat-val { font-size:22px; font-weight:820; order:1; color:#fff; }
+      .stat-val.ok { color:var(--accent-2); } .stat-val.warn { color:#fcd34d; }
 
-      .tabs { position:sticky; bottom:14px; display:flex; gap:4px; overflow-x:auto; margin-top:18px;
-        background:#fff; border-radius:18px; padding:8px; box-shadow:0 8px 28px rgba(0,0,0,.14); z-index:5; }
+      .tabs { position:sticky; bottom:14px; display:flex; gap:3px; overflow-x:auto; margin-top:20px; padding:7px;
+        border-radius:20px; z-index:5; background:var(--surface-solid); border:1px solid var(--border);
+        box-shadow:var(--shadow); backdrop-filter:blur(16px); }
       .tabs::-webkit-scrollbar { height:0; }
-      .tab { border:none; background:transparent; color:#64748b; padding:8px 12px; border-radius:12px;
-        font-size:12px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px;
-        white-space:nowrap; min-width:62px; }
-      .tab.active { background:#0891b2; color:#fff; }
-      .tab span { font-size:18px; }
+      .tab { border:none; background:transparent; color:var(--muted); padding:8px 13px; border-radius:14px;
+        font-size:11px; font-weight:600; cursor:pointer; display:flex; flex-direction:column; align-items:center;
+        gap:4px; white-space:nowrap; min-width:60px; transition:color .15s, background .2s; }
+      .tab:hover { color:var(--text); }
+      .tab.active { background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:var(--on-accent);
+        box-shadow:0 6px 18px rgba(163,230,53,.3); }
 
-      .card { background:#fff; border-radius:18px; padding:20px; margin-bottom:16px;
-        box-shadow:0 2px 10px rgba(0,0,0,.05); }
+      .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+        padding:22px; margin-bottom:16px; box-shadow:var(--shadow-sm); backdrop-filter:blur(12px);
+        animation:rise .35s ease both; }
+      @keyframes rise { from { opacity:0; transform:translateY(8px); } }
 
-      .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:12px; }
-      .kpi { background:#f8fafc; border:1px solid #eef2f7; border-radius:14px; padding:14px; }
-      .kpi-label { font-size:12px; color:#6b7280; } .kpi-val { font-size:22px; font-weight:800; margin:4px 0; }
-      .kpi-sub { font-size:12px; color:#9ca3af; }
+      .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:14px; }
+      .kpi { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:15px;
+        transition:transform .15s, border-color .15s; }
+      .kpi:hover { transform:translateY(-2px); border-color:var(--border-2); }
+      .kpi-label { font-size:12px; color:var(--muted); } .kpi-val { font-size:23px; font-weight:820; margin:5px 0; }
+      .kpi-sub { font-size:12px; color:var(--muted); }
 
-      .car-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-top:12px; }
-      .car { border:1px solid #eef2f7; border-radius:14px; padding:14px; background:#fff; }
-      .car-name { font-weight:700; } .car-actions { display:flex; gap:4px; }
-      .chips { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:10px; }
-      .chip { border-radius:10px; padding:8px 6px; text-align:center; border:1px solid #e5e7eb; }
-      .chip-label { font-size:10px; color:#6b7280; } .chip-val { font-size:12px; font-weight:700; }
-      .chip.green { background:#ecfdf5; border-color:#a7f3d0; } .chip.green .chip-val { color:#047857; }
-      .chip.orange { background:#fffbeb; border-color:#fde68a; } .chip.orange .chip-val { color:#b45309; }
-      .chip.red { background:#fef2f2; border-color:#fecaca; } .chip.red .chip-val { color:#b91c1c; }
-      .chip.muted { background:#f9fafb; } .chip.muted .chip-val { color:#9ca3af; }
+      .car-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px; margin-top:14px; }
+      .car { border:1px solid var(--border); border-radius:var(--r-sm); padding:16px; background:var(--surface-2);
+        transition:transform .15s, border-color .15s, box-shadow .2s; }
+      .car:hover { transform:translateY(-3px); border-color:var(--accent); box-shadow:0 12px 30px rgba(0,0,0,.25); }
+      .car-name { font-weight:750; font-size:15px; display:flex; align-items:center; gap:8px; }
+      .car-name .ic { color:var(--accent); }
+      .car-actions { display:flex; gap:4px; }
+      .chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(64px,1fr)); gap:7px; margin-top:12px; }
+      .chip { border-radius:12px; padding:9px 7px; text-align:center; border:1px solid var(--border); background:var(--surface); }
+      .chip-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+      .chip-val { font-size:12px; font-weight:750; margin-top:2px; }
+      .chip.green { background:color-mix(in srgb, var(--ok) 14%, transparent); border-color:color-mix(in srgb, var(--ok) 40%, transparent); }
+      .chip.green .chip-val { color:var(--ok); }
+      .chip.orange { background:color-mix(in srgb, var(--warn) 14%, transparent); border-color:color-mix(in srgb, var(--warn) 40%, transparent); }
+      .chip.orange .chip-val { color:var(--warn); }
+      .chip.red { background:color-mix(in srgb, var(--danger) 14%, transparent); border-color:color-mix(in srgb, var(--danger) 40%, transparent); }
+      .chip.red .chip-val { color:var(--danger); }
+      .chip.muted .chip-val { color:var(--muted); }
 
-      .tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-      .tag { font-size:12px; background:#f1f5f9; border-radius:999px; padding:4px 10px; }
-      .tag.warn { background:#fff7ed; color:#c2410c; } .tag.ok { background:#ecfdf5; color:#047857; }
+      .tags { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+      .tag { font-size:12px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:5px 11px; color:var(--text-dim); }
+      .tag.warn { background:color-mix(in srgb, var(--warn) 14%, transparent); color:var(--warn); border-color:transparent; }
+      .tag.ok { background:color-mix(in srgb, var(--ok) 14%, transparent); color:var(--ok); border-color:transparent; }
 
       .alert-row { display:flex; justify-content:space-between; align-items:center; gap:12px;
-        padding:12px; border:1px solid #eef2f7; border-radius:12px; margin-top:8px; }
-      .alert-row.critic { border-color:#fecaca; background:#fef2f2; }
-      .pill { font-size:12px; font-weight:700; border-radius:999px; padding:4px 12px; background:#e0f2fe; color:#0369a1; }
-      .pill.critic { background:#fee2e2; color:#b91c1c; } .pill.atentie { background:#fef3c7; color:#b45309; }
+        padding:13px 15px; border:1px solid var(--border); border-radius:14px; margin-top:9px; background:var(--surface-2); }
+      .alert-row.critic { border-color:color-mix(in srgb, var(--danger) 45%, transparent); background:color-mix(in srgb, var(--danger) 9%, transparent); }
+      .pill { font-size:12px; font-weight:700; border-radius:999px; padding:4px 13px;
+        background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--accent); }
+      .pill.critic { background:color-mix(in srgb, var(--danger) 18%, transparent); color:var(--danger); }
+      .pill.atentie { background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
 
-      .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:10px; }
-      label { display:flex; flex-direction:column; font-size:13px; color:#374151; gap:4px; }
-      label.inline { flex-direction:row; align-items:center; gap:6px; }
+      .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:13px; margin-top:12px; }
+      label { display:flex; flex-direction:column; font-size:13px; color:var(--text-dim); gap:5px; font-weight:500; }
+      label.inline { flex-direction:row; align-items:center; gap:7px; }
       label.check { flex-direction:row; align-items:center; gap:8px; }
-      input, select { padding:9px 10px; border:1px solid #d1d5db; border-radius:10px; font-size:14px;
-        font-family:inherit; background:#fff; color:#1f2937; }
-      input:focus, select:focus { outline:2px solid #0891b2; outline-offset:0; border-color:#0891b2; }
-      .svc-list { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
-      .svc-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; border:1px solid #eef2f7;
-        border-radius:10px; padding:8px 12px; }
-      .svc-label { font-weight:600; min-width:120px; }
-      .svc-row input { max-width:160px; }
-      .vin-row { display:flex; gap:6px; } .vin-row input { flex:1; min-width:0; }
+      input, select { padding:10px 12px; border:1px solid var(--border-2); border-radius:11px; font-size:14px;
+        font-family:inherit; background:var(--surface-2); color:var(--text); transition:border-color .15s, box-shadow .15s; }
+      input::placeholder { color:var(--muted); }
+      input:focus, select:focus { outline:none; border-color:var(--accent);
+        box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+      select option { background:var(--surface-solid); color:var(--text); }
+      .vin-row { display:flex; gap:7px; } .vin-row input { flex:1; min-width:0; }
 
-      .hint { font-size:12px; font-weight:400; color:#9ca3af; margin-left:6px; }
-      .disc-list { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
-      .disc-row { border:1px solid #eef2f7; border-radius:12px; padding:10px 14px; transition:border-color .15s, background .15s; }
-      .disc-row.on { border-color:#a5f3fc; background:#f7fdff; }
-      .switch { display:flex; flex-direction:row; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+      .hint { font-size:12px; font-weight:500; color:var(--muted); margin-left:8px; letter-spacing:0; text-transform:none; }
+      .disc-list { display:flex; flex-direction:column; gap:9px; margin-top:12px; }
+      .disc-row { border:1px solid var(--border); border-radius:14px; padding:12px 15px; background:var(--surface-2);
+        transition:border-color .18s, background .18s; }
+      .disc-row.on { border-color:color-mix(in srgb, var(--accent) 55%, transparent);
+        background:color-mix(in srgb, var(--accent) 7%, transparent); }
+      .switch { display:flex; flex-direction:row; align-items:center; gap:12px; cursor:pointer; user-select:none; }
       .switch input { position:absolute; opacity:0; width:0; height:0; }
-      .switch-track { width:42px; height:24px; border-radius:999px; background:#cbd5e1; position:relative; transition:background .15s; flex-shrink:0; }
-      .switch-thumb { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
-      .switch input:checked + .switch-track { background:#0891b2; }
-      .switch input:checked + .switch-track .switch-thumb { transform:translateX(18px); }
-      .switch-label { font-weight:600; font-size:14px; }
-      .disc-body { display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; padding-left:52px; }
-      .disc-body label.inline { color:#475569; }
+      .switch-track { width:44px; height:25px; border-radius:999px; background:var(--border-2); position:relative;
+        transition:background .2s; flex-shrink:0; }
+      .switch-thumb { position:absolute; top:3px; left:3px; width:19px; height:19px; border-radius:50%; background:#fff;
+        transition:transform .2s; box-shadow:0 1px 4px rgba(0,0,0,.35); }
+      .switch input:checked + .switch-track { background:linear-gradient(135deg,var(--accent),var(--accent-2)); }
+      .switch input:checked + .switch-track .switch-thumb { transform:translateX(19px); }
+      .switch-label { font-weight:650; font-size:14px; color:var(--text); }
+      .disc-body { display:flex; flex-wrap:wrap; gap:14px; margin-top:13px; padding-left:56px; }
 
-      .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
-      .btn { border:1px solid #d1d5db; background:#fff; padding:9px 16px; border-radius:10px; cursor:pointer;
-        font-size:14px; color:#374151; }
-      .btn.primary { background:#0891b2; border-color:#0891b2; color:#fff; font-weight:600; }
+      .form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap; }
+      .btn { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--border-2); background:var(--surface-2);
+        padding:10px 17px; border-radius:12px; cursor:pointer; font-size:14px; font-weight:600; color:var(--text);
+        transition:transform .12s, border-color .15s, background .15s; font-family:inherit; }
+      .btn:hover { transform:translateY(-1px); border-color:var(--accent); }
+      .btn.primary { background:linear-gradient(135deg,var(--accent),var(--accent-2)); border-color:transparent;
+        color:var(--on-accent); font-weight:750; box-shadow:0 8px 22px rgba(163,230,53,.28); }
+      .btn.primary:hover { box-shadow:0 10px 28px rgba(163,230,53,.4); }
       .btn.file { display:inline-flex; align-items:center; }
-      .icon-btn { border:none; background:transparent; cursor:pointer; font-size:16px; padding:4px; border-radius:8px; }
-      .icon-btn:hover { background:#f3f4f6; }
+      .icon-btn { display:inline-flex; align-items:center; border:none; background:transparent; cursor:pointer;
+        padding:6px; border-radius:9px; color:var(--muted); transition:background .15s, color .15s; }
+      .icon-btn:hover { background:var(--surface); color:var(--accent); }
 
-      .tbl { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
-      .tbl th { text-align:left; color:#6b7280; font-weight:600; padding:8px; border-bottom:1px solid #eef2f7; }
-      .tbl td { padding:8px; border-bottom:1px solid #f3f4f6; }
+      .tbl { width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; }
+      .tbl th { text-align:left; color:var(--muted); font-weight:600; padding:9px 8px; border-bottom:1px solid var(--border); }
+      .tbl td { padding:9px 8px; border-bottom:1px solid var(--border); color:var(--text-dim); }
 
-      .bar-row { display:flex; align-items:center; gap:12px; margin:8px 0; }
-      .bar-label { width:170px; font-size:13px; } .bar-val { width:110px; text-align:right; font-weight:600; font-size:13px; }
-      .bar { flex:1; background:#f1f5f9; border-radius:999px; height:10px; overflow:hidden; }
-      .bar-fill { height:100%; background:linear-gradient(90deg,#0891b2,#22d3ee); border-radius:999px; }
+      .bar-row { display:flex; align-items:center; gap:12px; margin:9px 0; }
+      .bar-label { width:170px; font-size:13px; } .bar-val { width:110px; text-align:right; font-weight:700; font-size:13px; }
+      .bar { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:999px; height:10px; overflow:hidden; }
+      .bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:999px; }
 
-      .empty { text-align:center; padding:36px 16px; }
-      .empty-icon { font-size:48px; } .empty h3 { margin-top:8px; }
-      .empty .btn { margin-top:12px; }
+      .empty { text-align:center; padding:48px 16px; }
+      .empty-icon { color:var(--accent); opacity:.7; } .empty h3 { margin-top:10px; }
+      .empty .btn { margin-top:14px; }
     </style>`;
   }
 }
