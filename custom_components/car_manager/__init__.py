@@ -93,6 +93,13 @@ async def _async_register_frontend(hass: HomeAssistant, domain_data: dict) -> No
         config={"version": version},
         embed_iframe=False,
     )
+
+    # Make the Lovelace card available on dashboards as `custom:car-manager-card`.
+    try:
+        frontend.add_extra_js_url(hass, f"{PANEL_FILES_URL}/car-manager-card.js?v={version}")
+    except Exception as err:  # noqa: BLE001 - never block setup on the optional card
+        _LOGGER.debug("Could not register Car Manager card: %s", err)
+
     domain_data["frontend_registered"] = True
 
 

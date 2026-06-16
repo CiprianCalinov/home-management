@@ -248,6 +248,7 @@ def _default_car() -> dict[str, Any]:
         "year": None,
         "mileage": 0,
         "mileage_date": None,
+        "budget_month": None,
         "legal": {
             "rca": None,
             "itp": None,

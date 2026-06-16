@@ -2,6 +2,14 @@
 
 Toate noutățile, pe versiuni.
 
+## v0.10.0
+- **Istoric tip calendar** — în pagina mașinii, evenimentele grupate pe lună, cu ziua.
+- **Card Lovelace** — pune starea flotei pe dashboardul principal HA
+  (`type: custom:car-manager-card`). Tap → deschide panoul.
+- **Buget lunar pe mașină** — setezi o limită; vezi cât ai cheltuit vs buget,
+  cu avertizare la depășire.
+- **Reminder sezonier anvelope** — primăvara/toamna apare un memento de schimbare.
+
 ## v0.9.1
 - Securitate: validare strictă a id-urilor de documente (anti path-traversal) și a
   pozelor (doar `data:image/...`), plus escapare la afișare (anti-XSS).

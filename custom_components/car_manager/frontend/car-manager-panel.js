@@ -61,7 +61,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.9.1";
+const PANEL_VERSION = "0.10.0";
 
 // Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
 const ICONS = {
@@ -538,6 +538,7 @@ class CarManagerPanel extends HTMLElement {
         </label>
         <label>An<input type="number" data-f="year" id="f-year" value="${e.year ?? ""}"></label>
         <label>Kilometraj<input type="number" data-f="mileage" value="${e.mileage ?? ""}"></label>
+        <label>Buget lunar (RON)<input type="number" data-f="budget_month" value="${e.budget_month ?? ""}" placeholder="opțional"></label>
       </div>`;
   }
 
@@ -803,6 +804,18 @@ class CarManagerPanel extends HTMLElement {
     const kmSpan = odos.length >= 2 ? Math.max(...odos) - Math.min(...odos) : 0;
     const costPerKm = kmSpan > 0 ? carTotal / kmSpan : null;
     const docs = raw.documents || [];
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const monthSpend = entries
+      .filter((e) => (e.date || "").slice(0, 7) === monthKey)
+      .reduce((s, e) => s + (e.amount || 0), 0);
+    const budget = raw.budget_month;
+    const budgetHtml = budget
+      ? `<div class="budget ${monthSpend > budget ? "over" : ""}">
+          <div class="budget-top"><span>Buget lunar</span><span>${fmtRon(monthSpend)} / ${fmtRon(budget)}</span></div>
+          <div class="budget-bar"><div style="width:${Math.min(100, (monthSpend / budget) * 100)}%"></div></div>
+          ${monthSpend > budget ? `<div class="budget-warn">Depășit cu ${fmtRon(monthSpend - budget)}</div>` : ""}
+        </div>`
+      : "";
 
     const chips = LEGAL_DEFS.filter((d) => view.legal[d.key].configured)
       .map((d) => {
@@ -858,6 +871,7 @@ class CarManagerPanel extends HTMLElement {
     } · ${view.mileage ? view.mileage.toLocaleString("ro-RO") + " km" : "—"}</div>
           </div>
         </div>
+        ${budgetHtml}
         <h3>Termene legale</h3>
         ${chips ? `<div class="chips">${chips}</div>` : `<div class="muted small">Niciun termen — apasă Editează.</div>`}
         <h3>Revizii & consumabile</h3>
@@ -957,7 +971,7 @@ class CarManagerPanel extends HTMLElement {
 
       <section class="card">
         <div class="row-between">
-          <h3 style="margin-top:0">${icon("wallet", 18)} Istoric & cheltuieli</h3>
+          <h3 style="margin-top:0">${icon("calendar", 18)} Istoric (calendar)</h3>
           <div class="detail-pills">
             ${costPerKm ? `<span class="pill">~${costPerKm.toFixed(2)} lei/km</span>` : ""}
             <span class="pill">${fmtRon(carTotal)}</span>
@@ -968,21 +982,38 @@ class CarManagerPanel extends HTMLElement {
   }
 
   _timelineHtml(entries) {
-    const meta = {
-      fuel: { ic: "fuel", label: "Alimentare" },
-      int: { ic: "kit", label: "Intervenție" },
-      cost: { ic: "wallet", label: "Cheltuială" },
-    };
-    return `<div class="timeline">${entries
-      .map((e) => {
-        const m = meta[e.src] || meta.cost;
-        return `<div class="tl-item">
-          <div class="tl-ic ${e.src}">${icon(m.ic, 16)}</div>
-          <div class="tl-body">
-            <div class="tl-top"><span class="tl-title">${esc(e.note || this._catLabel(e.cat))}</span><span class="tl-amt">${fmtRon(e.amount)}</span></div>
-            <div class="tl-sub muted small">${esc(this._catLabel(e.cat))} · ${esc(e.date || "fără dată")}</div>
-          </div>
-        </div>`;
+    const MONTHS = [
+      "ianuarie", "februarie", "martie", "aprilie", "mai", "iunie",
+      "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie",
+    ];
+    const meta = { fuel: { ic: "fuel" }, int: { ic: "kit" }, cost: { ic: "wallet" } };
+    // grupat pe lună, cea mai recentă prima — citește ca un jurnal/calendar
+    const groups = {};
+    entries.forEach((e) => {
+      const key = (e.date || "").slice(0, 7) || "0000-00";
+      (groups[key] = groups[key] || []).push(e);
+    });
+    return `<div class="timeline">${Object.keys(groups)
+      .sort()
+      .reverse()
+      .map((key) => {
+        const [y, m] = key.split("-");
+        const title = m && +m >= 1 && +m <= 12 ? `${MONTHS[+m - 1]} ${y}` : "Fără dată";
+        const rows = groups[key]
+          .map((e) => {
+            const ic = (meta[e.src] || meta.cost).ic;
+            const day = (e.date || "").slice(8, 10);
+            return `<div class="tl-item">
+              <div class="hist-day">${esc(day || "–")}</div>
+              <div class="tl-ic ${e.src}">${icon(ic, 16)}</div>
+              <div class="tl-body">
+                <div class="tl-top"><span class="tl-title">${esc(e.note || this._catLabel(e.cat))}</span><span class="tl-amt">${fmtRon(e.amount)}</span></div>
+                <div class="tl-sub muted small">${esc(this._catLabel(e.cat))}</div>
+              </div>
+            </div>`;
+          })
+          .join("");
+        return `<div class="hist-month">${esc(title)}</div>${rows}`;
       })
       .join("")}</div>`;
   }
@@ -1082,11 +1113,22 @@ class CarManagerPanel extends HTMLElement {
       });
     });
     items.sort((a, b) => a.days - b.days);
-    if (!items.length) return "";
+
+    const month = new Date().getMonth() + 1;
+    let seasonTip = null;
+    if (month === 3 || month === 4) seasonTip = "Perioada de schimbare pe anvelope de vară";
+    else if (month === 10 || month === 11) seasonTip = "Perioada de schimbare pe anvelope de iarnă";
+
+    if (!items.length && !seasonTip) return "";
     return `
       <section class="card">
         <div class="overline">URMĂTOARELE 90 DE ZILE</div>
         <h3 style="margin-top:4px">Ce urmează</h3>
+        ${
+          seasonTip
+            ? `<div class="alert-row"><div><strong>🛞 Anvelope</strong><div class="muted small">${esc(seasonTip)}</div></div><span class="pill atentie">sezon</span></div>`
+            : ""
+        }
         ${items
           .map(
             (it) => `<div class="alert-row ${it.days < 0 ? "critic" : ""}">
@@ -2157,6 +2199,18 @@ class CarManagerPanel extends HTMLElement {
       .tl-title { font-weight:600; font-size:14.5px; }
       .tl-amt { font-weight:700; white-space:nowrap; }
       .tl-sub { margin-top:2px; }
+      .hist-month { font-size:12px; font-weight:700; color:var(--accent-deep); text-transform:capitalize;
+        margin:18px 0 2px; letter-spacing:.01em; }
+      .hist-month:first-child { margin-top:6px; }
+      .hist-day { width:30px; flex-shrink:0; text-align:center; font-weight:800; font-size:15px; color:var(--text);
+        align-self:center; }
+      .budget { background:var(--surface-2); border-radius:14px; padding:13px 15px; margin:6px 0 10px; }
+      .budget.over { background:var(--danger-soft); }
+      .budget-top { display:flex; justify-content:space-between; font-size:13.5px; font-weight:600; }
+      .budget-bar { height:8px; background:var(--surface-3); border-radius:999px; margin-top:9px; overflow:hidden; }
+      .budget-bar div { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-deep)); border-radius:999px; }
+      .budget.over .budget-bar div { background:var(--danger); }
+      .budget-warn { color:var(--danger); font-size:12.5px; font-weight:600; margin-top:7px; }
 
       .doc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:13px; margin-top:14px; }
       .doc-card { border-radius:15px; overflow:hidden; background:var(--surface-2); }
