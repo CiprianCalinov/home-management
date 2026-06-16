@@ -2,6 +2,15 @@
 
 Toate noutățile, pe versiuni.
 
+## v0.9.0
+- **Poze documente per mașină** — atașezi poze (talon, RCA, ITP, rovinietă, CASCO)
+  la fiecare mașină, le vezi în pagina ei și le deschizi mărite. Stocate **privat**
+  (nu în folderul public `www`).
+- **Planificator 90 de zile** — pe Acasă vezi tot ce urmează (RCA/ITP/rovinietă/revizii),
+  sortat după dată, cu zile rămase.
+- **Insight lunar cu Gemini** — în Statistici, un rezumat AI al cheltuielilor tale,
+  folosind integrarea Google AI deja configurată.
+
 ## v0.8.0
 - **Timeline / istoric per mașină** — în pagina mașinii, toate evenimentele
   (alimentări, intervenții, cheltuieli) într-un istoric cronologic, cu iconițe.

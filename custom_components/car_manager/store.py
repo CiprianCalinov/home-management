@@ -123,6 +123,34 @@ class CarManagerStore:
         await self._async_save()
         return True
 
+    # ------------------------------------------------------------ documents
+    async def async_add_document_meta(self, car_id: str, entry: dict[str, Any]) -> dict[str, Any] | None:
+        car = self._data["cars"].get(car_id)
+        if car is None:
+            return None
+        doc = {
+            "id": _new_id(),
+            "kind": entry.get("kind", "altele"),
+            "label": entry.get("label", ""),
+            "thumb": entry.get("thumb"),
+            "added": entry.get("added"),
+        }
+        car.setdefault("documents", []).append(doc)
+        await self._async_save()
+        return doc
+
+    async def async_delete_document_meta(self, car_id: str, doc_id: str) -> bool:
+        car = self._data["cars"].get(car_id)
+        if car is None:
+            return False
+        docs = car.get("documents") or []
+        remaining = [d for d in docs if d.get("id") != doc_id]
+        if len(remaining) == len(docs):
+            return False
+        car["documents"] = remaining
+        await self._async_save()
+        return True
+
     async def async_delete_car(self, car_id: str) -> bool:
         if car_id not in self._data["cars"]:
             return False
@@ -246,6 +274,7 @@ def _default_car() -> dict[str, Any]:
             "note": "",
         },
         "interventions": [],
+        "documents": [],
     }
 
 

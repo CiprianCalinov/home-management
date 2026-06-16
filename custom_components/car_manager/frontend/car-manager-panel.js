@@ -40,6 +40,16 @@ const COST_CATEGORIES = [
   ["altele", "Altele"],
 ];
 
+const DOC_KINDS = [
+  ["talon", "Talon"],
+  ["rca", "RCA"],
+  ["itp", "ITP"],
+  ["rovinieta", "Rovinietă"],
+  ["casco", "CASCO"],
+  ["asigurare", "Altă asigurare"],
+  ["altele", "Alt document"],
+];
+
 const TABS = [
   ["acasa", "Acasă", "home"],
   ["masini", "Mașini", "car"],
@@ -51,7 +61,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.8.0";
+const PANEL_VERSION = "0.9.0";
 
 // Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
 const ICONS = {
@@ -74,6 +84,8 @@ const ICONS = {
   fwd: '<path d="M9 6l6 6-6 6"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
   calendar: '<rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
+  doc: '<path d="M7 3h7l5 5v12.5a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V3.5A.5.5 0 0 1 7 3z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 16.5h6"/>',
+  sparkle: '<path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z"/>',
 };
 function icon(name, size = 20) {
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
@@ -347,6 +359,8 @@ class CarManagerPanel extends HTMLElement {
           ${cars.map((c) => this._carCard(c)).join("")}
         </div>
       </section>
+
+      ${this._planner()}
 
       <section class="card">
         <div class="overline">ATENȚIONĂRI RAPIDE</div>
@@ -788,6 +802,7 @@ class CarManagerPanel extends HTMLElement {
     const odos = fuel.map((f) => f.odometer).filter(Boolean);
     const kmSpan = odos.length >= 2 ? Math.max(...odos) - Math.min(...odos) : 0;
     const costPerKm = kmSpan > 0 ? carTotal / kmSpan : null;
+    const docs = raw.documents || [];
 
     const chips = LEGAL_DEFS.filter((d) => view.legal[d.key].configured)
       .map((d) => {
@@ -860,6 +875,32 @@ class CarManagerPanel extends HTMLElement {
               : ""
           }
         </div>
+      </section>
+
+      <section class="card">
+        <h3 style="margin-top:0">${icon("doc", 18)} Documente</h3>
+        <p class="muted small">Poze cu talonul, RCA, ITP, rovinieta… la îndemână (stocate privat).</p>
+        <div class="form-grid" style="grid-template-columns:1fr auto; align-items:end">
+          <label>Tip document<select id="doc-kind">${DOC_KINDS.map(
+            ([v, l]) => `<option value="${v}">${esc(l)}</option>`
+          ).join("")}</select></label>
+          <button class="btn primary" data-action="add-doc" data-id="${carId}">${icon("camera", 16)} Adaugă poză</button>
+        </div>
+        ${
+          docs.length
+            ? `<div class="doc-grid">${docs
+                .map(
+                  (d) => `<div class="doc-card">
+            <div class="doc-thumb" data-action="view-doc" data-car="${carId}" data-id="${d.id}">${
+                    d.thumb ? `<img src="${d.thumb}" alt="">` : icon("doc", 26)
+                  }</div>
+            <div class="doc-meta"><span>${esc(d.label || this._docLabel(d.kind))}</span>
+              <button class="icon-btn" data-action="del-doc" data-car="${carId}" data-id="${d.id}">${icon("trash", 15)}</button></div>
+          </div>`
+                )
+                .join("")}</div>`
+            : `<div class="muted small" style="margin-top:8px">Niciun document atașat.</div>`
+        }
       </section>
 
       <section class="card">
@@ -949,6 +990,113 @@ class CarManagerPanel extends HTMLElement {
   _catLabel(cat) {
     const extra = { interventie: "Intervenție", service: "Service" };
     return extra[cat] || Object.fromEntries(COST_CATEGORIES)[cat] || cat;
+  }
+
+  _docLabel(kind) {
+    return Object.fromEntries(DOC_KINDS)[kind] || kind;
+  }
+
+  async _addDoc(carId) {
+    const kindSel = this.shadowRoot.getElementById("doc-kind");
+    const kind = kindSel ? kindSel.value : "altele";
+    const file = await this._pickImage();
+    if (!file) return;
+    this._toast("Se încarcă documentul…");
+    let full, thumb;
+    try {
+      full = await this._scaleImage(file, 1400, 0.78);
+      thumb = await this._scaleImage(file, 280, 0.6);
+    } catch (err) {
+      this._toast("Imagine invalidă.");
+      return;
+    }
+    this._mutate("upload_document", { car_id: carId, kind, label: this._docLabel(kind), thumb, image: full });
+  }
+
+  async _viewDoc(carId, docId) {
+    const overlay = document.createElement("div");
+    overlay.className = "doc-overlay";
+    overlay.innerHTML = `<div class="doc-modal"><button class="doc-close" title="Închide">✕</button><div class="doc-img muted">Se încarcă…</div></div>`;
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay || e.target.closest(".doc-close")) overlay.remove();
+    });
+    this.shadowRoot.appendChild(overlay);
+    let res;
+    try {
+      res = await this._call("get_document", { car_id: carId, doc_id: docId });
+    } catch (err) {
+      res = null;
+    }
+    const wrap = overlay.querySelector(".doc-img");
+    if (res && res.image) {
+      wrap.innerHTML = `<img src="${res.image}" alt="">`;
+      wrap.classList.remove("muted");
+    } else {
+      wrap.textContent = "Imaginea nu a putut fi încărcată.";
+    }
+  }
+
+  async _genInsight() {
+    const el = this.shadowRoot.getElementById("insight-text");
+    if (el) {
+      el.textContent = "Se generează rezumatul cu Gemini…";
+      el.classList.add("muted");
+    }
+    let res;
+    try {
+      res = await this._call("insight", {});
+    } catch (err) {
+      if (el) el.textContent = `Eroare: ${err}`;
+      return;
+    }
+    if (el) {
+      if (res && res.ok) {
+        el.textContent = res.text;
+        el.classList.remove("muted");
+      } else {
+        el.textContent = (res && res.error) || "Nu s-a putut genera.";
+      }
+    }
+  }
+
+  _planner() {
+    const today = new Date();
+    void today;
+    const items = [];
+    this._data.view.cars.forEach((c) => {
+      LEGAL_DEFS.forEach((d) => {
+        const i = c.legal[d.key];
+        if (i.configured && i.zile_ramase != null && i.zile_ramase <= 90)
+          items.push({ car: c.name, label: d.label, days: i.zile_ramase, date: i.expira });
+      });
+      Object.values(c.service || {}).forEach((s) => {
+        if (s.days_remaining != null && s.days_remaining <= 90 && s.days_remaining >= -730)
+          items.push({ car: c.name, label: s.label, days: s.days_remaining, date: s.last_date });
+      });
+      Object.values(c.equipment || {}).forEach((e) => {
+        if (e.zile_ramase != null && e.zile_ramase <= 90)
+          items.push({ car: c.name, label: e.label, days: e.zile_ramase, date: e.expira });
+      });
+    });
+    items.sort((a, b) => a.days - b.days);
+    if (!items.length) return "";
+    return `
+      <section class="card">
+        <div class="overline">URMĂTOARELE 90 DE ZILE</div>
+        <h3 style="margin-top:4px">Ce urmează</h3>
+        ${items
+          .map(
+            (it) => `<div class="alert-row ${it.days < 0 ? "critic" : ""}">
+          <div><strong>${esc(it.label)}</strong><div class="muted small">${esc(it.car)}${
+              it.date ? " · " + esc(it.date) : ""
+            }</div></div>
+          <span class="pill ${it.days < 0 ? "critic" : it.days <= 14 ? "atentie" : ""}">${
+              it.days < 0 ? `expirat ${-it.days}z` : `în ${it.days} zile`
+            }</span>
+        </div>`
+          )
+          .join("")}
+      </section>`;
   }
 
   _carCostEntries(carId) {
@@ -1083,6 +1231,14 @@ class CarManagerPanel extends HTMLElement {
     const cars = this._data.raw.cars || {};
 
     return `
+      <section class="card">
+        <div class="row-between">
+          <div><div class="overline">AI · GEMINI</div><h3 style="margin-top:4px">Insight lunar</h3></div>
+          <button class="btn primary" data-action="gen-insight">${icon("sparkle", 16)} Generează</button>
+        </div>
+        <div id="insight-text" class="muted" style="margin-top:12px; line-height:1.55">Apasă „Generează" pentru un rezumat AI al cheltuielilor tale (folosește integrarea ta Google AI).</div>
+      </section>
+
       <section class="card">
         <div class="overline">STATISTICI</div>
         <h2>Pe tip de cheltuială (${costs.year})</h2>
@@ -1459,6 +1615,19 @@ class CarManagerPanel extends HTMLElement {
         break;
       case "del-int-saved":
         this._mutate("delete_intervention", { car_id: el.dataset.car, item_id: el.dataset.id });
+        break;
+      case "add-doc":
+        this._addDoc(el.dataset.id);
+        break;
+      case "view-doc":
+        this._viewDoc(el.dataset.car, el.dataset.id);
+        break;
+      case "del-doc":
+        if (confirm("Ștergi acest document?"))
+          this._mutate("delete_document", { car_id: el.dataset.car, doc_id: el.dataset.id });
+        break;
+      case "gen-insight":
+        this._genInsight();
         break;
       case "add-cost":
         this._addCost();
@@ -1985,6 +2154,21 @@ class CarManagerPanel extends HTMLElement {
       .tl-title { font-weight:600; font-size:14.5px; }
       .tl-amt { font-weight:700; white-space:nowrap; }
       .tl-sub { margin-top:2px; }
+
+      .doc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:13px; margin-top:14px; }
+      .doc-card { border-radius:15px; overflow:hidden; background:var(--surface-2); }
+      .doc-thumb { aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; cursor:pointer;
+        color:var(--muted); background:var(--surface-3); overflow:hidden; }
+      .doc-thumb img { width:100%; height:100%; object-fit:cover; transition:transform .2s; }
+      .doc-thumb:hover img { transform:scale(1.05); }
+      .doc-meta { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:8px 10px; font-size:13px; font-weight:600; }
+      .doc-overlay { position:fixed; inset:0; background:rgba(0,0,0,.78); display:flex; align-items:center;
+        justify-content:center; z-index:50; padding:20px; backdrop-filter:blur(4px); }
+      .doc-modal { position:relative; max-width:92vw; max-height:90vh; }
+      .doc-close { position:absolute; top:-14px; right:-14px; width:40px; height:40px; border-radius:50%; border:none;
+        background:#fff; color:#1d1d1f; font-size:18px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+      .doc-img { display:flex; align-items:center; justify-content:center; color:#fff; min-width:200px; min-height:120px; }
+      .doc-img img { max-width:92vw; max-height:86vh; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
 
       .empty { text-align:center; padding:56px 16px; }
       .empty-icon { color:var(--accent); } .empty h3 { margin-top:14px; }

@@ -192,6 +192,7 @@
 
     let seq = 100;
     const newId = () => "id" + (++seq);
+    const docFull = {}; // doc_id -> full dataURL (preview only)
     const deepMerge = (t, s) => { for (const k in s) {
       if (s[k] && typeof s[k] === "object" && !Array.isArray(s[k]) && t[k] && typeof t[k] === "object") deepMerge(t[k], s[k]);
       else t[k] = s[k]; } return t; };
@@ -208,6 +209,11 @@
       delete_cost: (m) => { raw.costs = raw.costs.filter((c) => c.id !== m.entry_id); return snapshot(); },
       add_intervention: (m) => { const car = raw.cars[m.car_id]; if (car) (car.interventions = car.interventions || []).push(Object.assign({ id: newId() }, m.item)); return snapshot(); },
       delete_intervention: (m) => { const car = raw.cars[m.car_id]; if (car) car.interventions = (car.interventions || []).filter((i) => i.id !== m.item_id); return snapshot(); },
+      upload_document: (m) => { const car = raw.cars[m.car_id]; if (car) { const id = newId();
+        (car.documents = car.documents || []).push({ id, kind: m.kind, label: m.label, thumb: m.thumb, added: new Date().toISOString().slice(0, 10) }); docFull[id] = m.image; } return snapshot(); },
+      get_document: (m) => ({ image: docFull[m.doc_id] || null }),
+      delete_document: (m) => { const car = raw.cars[m.car_id]; if (car) car.documents = (car.documents || []).filter((d) => d.id !== m.doc_id); delete docFull[m.doc_id]; return snapshot(); },
+      insight: () => ({ ok: true, text: "Luna aceasta ai cheltuit aproximativ 1.700 lei, peste media ta, în special pe combustibil și o intervenție. Consumul mediu pare normal. Sugestie: planifică din timp RCA-ul care expiră curând, ca să eviți o pauză de acoperire. (text demo în preview)" }),
       update_settings: (m) => { Object.assign(raw.settings, m.settings); return snapshot(); },
       import_merge: () => snapshot(),
       // Decodare VIN demo (în HA real folosește serviciul NHTSA prin backend).

@@ -206,6 +206,89 @@ async def ws_decode_vin(hass, connection, msg):
     connection.send_result(msg["id"], await async_decode_vin(hass, msg["vin"]))
 
 
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/upload_document",
+        vol.Required("car_id"): str,
+        vol.Required("kind"): str,
+        vol.Optional("label"): str,
+        vol.Required("thumb"): str,
+        vol.Required("image"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_upload_document(hass, connection, msg):
+    from .docs import async_save_document
+
+    coordinator = _coordinator(hass)
+    doc = await coordinator.store.async_add_document_meta(
+        msg["car_id"],
+        {
+            "kind": msg["kind"],
+            "label": msg.get("label", ""),
+            "thumb": msg["thumb"],
+            "added": dt_util.now().date().isoformat(),
+        },
+    )
+    if doc is None:
+        connection.send_error(msg["id"], "not_found", "Car not found")
+        return
+    await async_save_document(hass, msg["car_id"], doc["id"], msg["image"])
+    await coordinator.async_notify_changed()
+    connection.send_result(msg["id"], _snapshot(hass))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/get_document",
+        vol.Required("car_id"): str,
+        vol.Required("doc_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_get_document(hass, connection, msg):
+    from .docs import async_read_document
+
+    image = await async_read_document(hass, msg["car_id"], msg["doc_id"])
+    connection.send_result(msg["id"], {"image": image})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/delete_document",
+        vol.Required("car_id"): str,
+        vol.Required("doc_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_delete_document(hass, connection, msg):
+    from .docs import async_delete_document
+
+    coordinator = _coordinator(hass)
+    await coordinator.store.async_delete_document_meta(msg["car_id"], msg["doc_id"])
+    await async_delete_document(hass, msg["car_id"], msg["doc_id"])
+    await coordinator.async_notify_changed()
+    connection.send_result(msg["id"], _snapshot(hass))
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/insight"})
+@websocket_api.async_response
+async def ws_insight(hass, connection, msg):
+    from .vision import async_insight
+
+    coordinator = _coordinator(hass)
+    costs = (coordinator.data or {}).get("costs", {})
+    summary = {
+        "total_luna_curenta": costs.get("grand_month"),
+        "total_an": costs.get("grand_total_year"),
+        "combustibil_an": costs.get("fuel_total_year"),
+        "service_taxe_an": costs.get("total_year"),
+        "pe_categorii": costs.get("by_category"),
+        "consum_l_100km": costs.get("consumption"),
+    }
+    connection.send_result(msg["id"], await async_insight(hass, summary))
+
+
 @callback
 def async_register_websocket(hass: HomeAssistant) -> None:
     """Register all panel websocket commands once."""
@@ -226,6 +309,10 @@ def async_register_websocket(hass: HomeAssistant) -> None:
         ws_decode_vin,
         ws_add_intervention,
         ws_delete_intervention,
+        ws_upload_document,
+        ws_get_document,
+        ws_delete_document,
+        ws_insight,
     ):
         websocket_api.async_register_command(hass, handler)
     hass.data[DOMAIN]["ws_registered"] = True

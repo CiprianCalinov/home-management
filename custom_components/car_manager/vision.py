@@ -134,6 +134,37 @@ def _parse_json(text: str) -> dict[str, Any] | None:
     return None
 
 
+INSIGHT_PROMPT = (
+    "Ești un asistent auto prietenos. Pe baza datelor de cheltuieli de mai jos "
+    "(sume în RON, consum în L/100km), scrie un rezumat SCURT în limba română, "
+    "3-4 fraze, cu 1-2 observații utile (ex. categoria pe care s-a cheltuit cel "
+    "mai mult, dacă consumul pare mare, o sugestie). Nu inventa date care nu "
+    "există. Răspunde DOAR cu textul rezumatului, fără markdown. Date:\n"
+)
+
+
+def _insight_call(key: str, model: str, prompt: str) -> str:
+    from google.genai import Client
+
+    client = Client(api_key=key)
+    response = client.models.generate_content(model=model, contents=[prompt])
+    return response.text or ""
+
+
+async def async_insight(hass: HomeAssistant, summary: dict[str, Any]) -> dict[str, Any]:
+    """Ask Gemini for a short human summary of the spending data."""
+    key, model = _find_credentials(hass, "")
+    if not key:
+        return {"ok": False, "error": "Google Generative AI (Gemini) nu este configurat în HA."}
+    prompt = INSIGHT_PROMPT + json.dumps(summary, ensure_ascii=False, indent=2)
+    try:
+        text = await hass.async_add_executor_job(_insight_call, key, model, prompt)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.exception("Car Manager: insight Gemini a eșuat")
+        return {"ok": False, "error": f"Eroare Gemini: {err}"}
+    return {"ok": True, "text": (text or "").strip(), "model": model}
+
+
 async def async_decode_vin(hass: HomeAssistant, vin: str) -> dict[str, Any]:
     """Decode a VIN to make/model/year via the free NHTSA vPIC API."""
     code = (vin or "").strip().upper()
