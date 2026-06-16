@@ -2,6 +2,11 @@
 
 Toate noutățile, pe versiuni.
 
+## v0.8.0
+- **Timeline / istoric per mașină** — în pagina mașinii, toate evenimentele
+  (alimentări, intervenții, cheltuieli) într-un istoric cronologic, cu iconițe.
+- **Cost pe km** — estimare automată (lei/km) din kilometrajul alimentărilor.
+
 ## v0.7.0
 - **Fix alerte**: dotările expirate (trusă medicală, stingător) generează acum
   atenționări (critic dacă au expirat).

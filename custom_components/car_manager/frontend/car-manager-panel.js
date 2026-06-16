@@ -51,7 +51,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.7.0";
+const PANEL_VERSION = "0.8.0";
 
 // Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
 const ICONS = {
@@ -785,6 +785,9 @@ class CarManagerPanel extends HTMLElement {
     const cons = (this._data.view.costs.consumption || {})[carId];
     const entries = this._carCostEntries(carId);
     const carTotal = entries.reduce((s, e) => s + (e.amount || 0), 0);
+    const odos = fuel.map((f) => f.odometer).filter(Boolean);
+    const kmSpan = odos.length >= 2 ? Math.max(...odos) - Math.min(...odos) : 0;
+    const costPerKm = kmSpan > 0 ? carTotal / kmSpan : null;
 
     const chips = LEGAL_DEFS.filter((d) => view.legal[d.key].configured)
       .map((d) => {
@@ -912,20 +915,35 @@ class CarManagerPanel extends HTMLElement {
       </section>
 
       <section class="card">
-        <div class="row-between"><h3 style="margin-top:0">${icon("wallet", 18)} Cheltuieli mașină</h3><span class="pill">${fmtRon(carTotal)}</span></div>
-        ${
-          entries.length
-            ? `<table class="tbl"><thead><tr><th>Data</th><th>Categorie</th><th>Sumă</th><th>Notă</th></tr></thead><tbody>${entries
-                .map(
-                  (e) =>
-                    `<tr><td>${esc(e.date || "")}</td><td>${esc(this._catLabel(e.cat))}</td><td>${fmtRon(
-                      e.amount
-                    )}</td><td>${esc(e.note || "")}</td></tr>`
-                )
-                .join("")}</tbody></table>`
-            : `<div class="muted small" style="margin-top:10px">Nicio cheltuială.</div>`
-        }
+        <div class="row-between">
+          <h3 style="margin-top:0">${icon("wallet", 18)} Istoric & cheltuieli</h3>
+          <div class="detail-pills">
+            ${costPerKm ? `<span class="pill">~${costPerKm.toFixed(2)} lei/km</span>` : ""}
+            <span class="pill">${fmtRon(carTotal)}</span>
+          </div>
+        </div>
+        ${entries.length ? this._timelineHtml(entries) : `<div class="muted small" style="margin-top:10px">Nimic încă. Adaugă o alimentare sau o intervenție mai sus.</div>`}
       </section>`;
+  }
+
+  _timelineHtml(entries) {
+    const meta = {
+      fuel: { ic: "fuel", label: "Alimentare" },
+      int: { ic: "kit", label: "Intervenție" },
+      cost: { ic: "wallet", label: "Cheltuială" },
+    };
+    return `<div class="timeline">${entries
+      .map((e) => {
+        const m = meta[e.src] || meta.cost;
+        return `<div class="tl-item">
+          <div class="tl-ic ${e.src}">${icon(m.ic, 16)}</div>
+          <div class="tl-body">
+            <div class="tl-top"><span class="tl-title">${esc(e.note || this._catLabel(e.cat))}</span><span class="tl-amt">${fmtRon(e.amount)}</span></div>
+            <div class="tl-sub muted small">${esc(this._catLabel(e.cat))} · ${esc(e.date || "fără dată")}</div>
+          </div>
+        </div>`;
+      })
+      .join("")}</div>`;
   }
 
   _catLabel(cat) {
@@ -1954,6 +1972,19 @@ class CarManagerPanel extends HTMLElement {
         border-bottom:1px solid var(--hairline); font-size:14px; }
       .line-row:last-child { border-bottom:none; }
       .t-warn { color:var(--warn); font-weight:600; } .t-danger { color:var(--danger); font-weight:600; }
+      .detail-pills { display:flex; gap:8px; flex-wrap:wrap; }
+      .timeline { display:flex; flex-direction:column; margin-top:6px; }
+      .tl-item { display:flex; gap:13px; padding:14px 0; border-bottom:1px solid var(--hairline); }
+      .tl-item:last-child { border-bottom:none; }
+      .tl-ic { width:38px; height:38px; border-radius:11px; background:var(--surface-2); display:flex;
+        align-items:center; justify-content:center; color:var(--muted); flex-shrink:0; }
+      .tl-ic.fuel { background:var(--accent-soft); color:var(--accent-deep); }
+      .tl-ic.int { background:var(--warn-soft); color:#b76e00; }
+      .tl-body { flex:1; min-width:0; }
+      .tl-top { display:flex; justify-content:space-between; gap:10px; }
+      .tl-title { font-weight:600; font-size:14.5px; }
+      .tl-amt { font-weight:700; white-space:nowrap; }
+      .tl-sub { margin-top:2px; }
 
       .empty { text-align:center; padding:56px 16px; }
       .empty-icon { color:var(--accent); } .empty h3 { margin-top:14px; }
