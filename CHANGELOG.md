@@ -2,6 +2,10 @@
 
 Toate noutățile, pe versiuni.
 
+## v0.9.1
+- Securitate: validare strictă a id-urilor de documente (anti path-traversal) și a
+  pozelor (doar `data:image/...`), plus escapare la afișare (anti-XSS).
+
 ## v0.9.0
 - **Poze documente per mașină** — atașezi poze (talon, RCA, ITP, rovinietă, CASCO)
   la fiecare mașină, le vezi în pagina ei și le deschizi mărite. Stocate **privat**

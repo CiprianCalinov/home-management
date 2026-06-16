@@ -218,7 +218,11 @@ async def ws_decode_vin(hass, connection, msg):
 )
 @websocket_api.async_response
 async def ws_upload_document(hass, connection, msg):
-    from .docs import async_save_document
+    from .docs import async_save_document, is_data_image
+
+    if not is_data_image(msg["thumb"]) or not is_data_image(msg["image"]):
+        connection.send_error(msg["id"], "invalid_image", "Document invalid (nu e imagine).")
+        return
 
     coordinator = _coordinator(hass)
     doc = await coordinator.store.async_add_document_meta(
@@ -249,7 +253,12 @@ async def ws_upload_document(hass, connection, msg):
 async def ws_get_document(hass, connection, msg):
     from .docs import async_read_document
 
-    image = await async_read_document(hass, msg["car_id"], msg["doc_id"])
+    # Only read files that are actually registered for this car — blocks any
+    # attempt to point the path at something the user never uploaded.
+    store = _coordinator(hass).store
+    car = store.cars.get(msg["car_id"])
+    known = car and any(d.get("id") == msg["doc_id"] for d in (car.get("documents") or []))
+    image = await async_read_document(hass, msg["car_id"], msg["doc_id"]) if known else None
     connection.send_result(msg["id"], {"image": image})
 
 
@@ -265,9 +274,11 @@ async def ws_delete_document(hass, connection, msg):
     from .docs import async_delete_document
 
     coordinator = _coordinator(hass)
-    await coordinator.store.async_delete_document_meta(msg["car_id"], msg["doc_id"])
-    await async_delete_document(hass, msg["car_id"], msg["doc_id"])
-    await coordinator.async_notify_changed()
+    # Remove the file only if its metadata existed (a real, registered doc id).
+    removed = await coordinator.store.async_delete_document_meta(msg["car_id"], msg["doc_id"])
+    if removed:
+        await async_delete_document(hass, msg["car_id"], msg["doc_id"])
+        await coordinator.async_notify_changed()
     connection.send_result(msg["id"], _snapshot(hass))
 
 

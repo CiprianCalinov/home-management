@@ -61,7 +61,7 @@ const TABS = [
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.9.0";
+const PANEL_VERSION = "0.9.1";
 
 // Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
 const ICONS = {
@@ -892,7 +892,7 @@ class CarManagerPanel extends HTMLElement {
                 .map(
                   (d) => `<div class="doc-card">
             <div class="doc-thumb" data-action="view-doc" data-car="${carId}" data-id="${d.id}">${
-                    d.thumb ? `<img src="${d.thumb}" alt="">` : icon("doc", 26)
+                    d.thumb && /^data:image\//.test(d.thumb) ? `<img src="${esc(d.thumb)}" alt="">` : icon("doc", 26)
                   }</div>
             <div class="doc-meta"><span>${esc(d.label || this._docLabel(d.kind))}</span>
               <button class="icon-btn" data-action="del-doc" data-car="${carId}" data-id="${d.id}">${icon("trash", 15)}</button></div>
@@ -1028,8 +1028,11 @@ class CarManagerPanel extends HTMLElement {
       res = null;
     }
     const wrap = overlay.querySelector(".doc-img");
-    if (res && res.image) {
-      wrap.innerHTML = `<img src="${res.image}" alt="">`;
+    if (res && res.image && /^data:image\//.test(res.image)) {
+      const img = document.createElement("img");
+      img.src = res.image;
+      wrap.textContent = "";
+      wrap.appendChild(img);
       wrap.classList.remove("muted");
     } else {
       wrap.textContent = "Imaginea nu a putut fi încărcată.";
