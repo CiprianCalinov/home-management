@@ -79,6 +79,7 @@ class CarManagerStore:
         car = _default_car()
         _deep_update(car, payload)
         car["id"] = car_id
+        _ensure_intervention_ids(car)
         self._data["cars"][car_id] = car
         await self._async_save()
         return car
@@ -89,8 +90,38 @@ class CarManagerStore:
             return None
         _deep_update(car, payload)
         car["id"] = car_id
+        _ensure_intervention_ids(car)
         await self._async_save()
         return car
+
+    # ------------------------------------------------------------ interventions
+    async def async_add_intervention(self, car_id: str, item: dict[str, Any]) -> dict[str, Any] | None:
+        car = self._data["cars"].get(car_id)
+        if car is None:
+            return None
+        entry = {
+            "id": _new_id(),
+            "name": item.get("name", ""),
+            "description": item.get("description", ""),
+            "amount": _to_float(item.get("amount")),
+            "date": item.get("date"),
+            "km": _to_int(item.get("km")),
+        }
+        car.setdefault("interventions", []).append(entry)
+        await self._async_save()
+        return entry
+
+    async def async_delete_intervention(self, car_id: str, item_id: str) -> bool:
+        car = self._data["cars"].get(car_id)
+        if car is None:
+            return False
+        items = car.get("interventions") or []
+        remaining = [i for i in items if i.get("id") != item_id]
+        if len(remaining) == len(items):
+            return False
+        car["interventions"] = remaining
+        await self._async_save()
+        return True
 
     async def async_delete_car(self, car_id: str) -> bool:
         if car_id not in self._data["cars"]:
@@ -216,6 +247,12 @@ def _default_car() -> dict[str, Any]:
         },
         "interventions": [],
     }
+
+
+def _ensure_intervention_ids(car: dict[str, Any]) -> None:
+    for item in car.get("interventions") or []:
+        if not item.get("id"):
+            item["id"] = _new_id()
 
 
 def _deep_update(target: dict[str, Any], source: dict[str, Any]) -> dict[str, Any]:

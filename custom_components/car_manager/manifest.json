@@ -1,7 +1,7 @@
 {
   "domain": "car_manager",
   "name": "Car Manager",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "documentation": "https://github.com/CiprianCalinov/home-management",
   "issue_tracker": "https://github.com/CiprianCalinov/home-management/issues",
   "dependencies": ["http", "frontend", "panel_custom", "websocket_api"],

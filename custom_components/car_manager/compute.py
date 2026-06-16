@@ -98,6 +98,31 @@ def compute_service(car: dict[str, Any], today: date) -> dict[str, Any]:
     return result
 
 
+def compute_equipment(car: dict[str, Any], today: date) -> dict[str, Any]:
+    """Expiry tracking for the date-based mandatory equipment (kit, extinguisher)."""
+    eq = car.get("equipment") or {}
+    result: dict[str, Any] = {}
+    for key, label in (("trusa_medicala", "Trusă medicală"), ("stingator", "Stingător")):
+        item = eq.get(key)
+        if isinstance(item, dict):
+            has = bool(item.get("has") or item.get("expira"))
+            expira = item.get("expira")
+        elif isinstance(item, str) and item:
+            has, expira = True, item
+        else:
+            has, expira = False, None
+        days = _days_until(expira, today)
+        result[key] = {
+            "label": label,
+            "has": has,
+            "expira": _parse_date(expira).isoformat() if _parse_date(expira) else None,
+            "zile_ramase": days,
+            "alert": days is not None and days <= ALERT_DAYS,
+            "expired": days is not None and days < 0,
+        }
+    return result
+
+
 def compute_attention(car_view: dict[str, Any]) -> list[dict[str, Any]]:
     """Flatten everything that needs attention into a sorted alert list."""
     alerts: list[dict[str, Any]] = []
@@ -124,6 +149,17 @@ def compute_attention(car_view: dict[str, Any]) -> list[dict[str, Any]]:
                     "severity": "critic" if info["overdue"] else "atentie",
                 }
             )
+    for key, info in car_view.get("equipment", {}).items():
+        if info.get("alert"):
+            alerts.append(
+                {
+                    "type": "equipment",
+                    "key": key,
+                    "label": info["label"],
+                    "days": info["zile_ramase"],
+                    "severity": "critic" if info["expired"] else "atentie",
+                }
+            )
     alerts.sort(key=lambda a: (a["severity"] != "critic", a.get("days") if a.get("days") is not None else 9999))
     return alerts
 
@@ -138,6 +174,7 @@ def compute_car_view(car: dict[str, Any], today: date) -> dict[str, Any]:
         "mileage": car.get("mileage") or 0,
         "legal": compute_legal(car, today),
         "service": compute_service(car, today),
+        "equipment": compute_equipment(car, today),
     }
     view["attention"] = compute_attention(view)
     view["status_ok"] = len(view["attention"]) == 0
@@ -146,44 +183,49 @@ def compute_car_view(car: dict[str, Any], today: date) -> dict[str, Any]:
 
 def compute_costs(data: dict[str, Any], today: date) -> dict[str, Any]:
     """Cost rollups: current-year totals, per category, per car, fuel stats."""
-    year = today.year
+    year, month = today.year, today.month
     costs = data.get("costs") or []
     fuel = data.get("fuel") or []
 
     by_car: dict[str, dict[str, float]] = {}
     by_category: dict[str, float] = {}
     total_year = 0.0
+    total_month = 0.0
+    fuel_month = 0.0
 
-    def _entry_year(entry: dict[str, Any]) -> int | None:
-        parsed = _parse_date(entry.get("date"))
-        return parsed.year if parsed else None
+    def _add(car_id: str, cat: str, amount: float, parsed: date | None) -> None:
+        nonlocal total_year, total_month
+        if not parsed or parsed.year != year:
+            return
+        total_year += amount
+        by_category[cat] = by_category.get(cat, 0) + amount
+        by_car.setdefault(car_id, {})
+        by_car[car_id][cat] = by_car[car_id].get(cat, 0) + amount
+        if parsed.month == month:
+            total_month += amount
 
     for entry in costs:
-        amount = entry.get("amount") or 0
-        car_id = entry.get("car_id")
-        cat = entry.get("category", "altele")
-        if _entry_year(entry) == year:
-            total_year += amount
-            by_category[cat] = by_category.get(cat, 0) + amount
-            by_car.setdefault(car_id, {})
-            by_car[car_id][cat] = by_car[car_id].get(cat, 0) + amount
+        _add(
+            entry.get("car_id"),
+            entry.get("category", "altele"),
+            entry.get("amount") or 0,
+            _parse_date(entry.get("date")),
+        )
 
-    # per-vehicle "alte intervenții" count as costs in their year
+    # per-vehicle "alte intervenții" count as costs in their year/month
     for car in (data.get("cars") or {}).values():
-        car_id = car.get("id")
         for item in car.get("interventions") or []:
-            amount = item.get("amount") or 0
-            if amount and _entry_year(item) == year:
-                total_year += amount
-                by_category["interventie"] = by_category.get("interventie", 0) + amount
-                by_car.setdefault(car_id, {})
-                by_car[car_id]["interventie"] = by_car[car_id].get("interventie", 0) + amount
+            _add(car.get("id"), "interventie", item.get("amount") or 0, _parse_date(item.get("date")))
 
     # fuel as its own cost stream + consumption stats
     fuel_total_year = 0.0
     for entry in fuel:
-        if _entry_year(entry) == year:
-            fuel_total_year += entry.get("price_total") or 0
+        parsed = _parse_date(entry.get("date"))
+        if parsed and parsed.year == year:
+            price = entry.get("price_total") or 0
+            fuel_total_year += price
+            if parsed.month == month:
+                fuel_month += price
 
     consumption = _fuel_consumption(fuel)
 
@@ -192,6 +234,9 @@ def compute_costs(data: dict[str, Any], today: date) -> dict[str, Any]:
         "total_year": round(total_year, 2),
         "fuel_total_year": round(fuel_total_year, 2),
         "grand_total_year": round(total_year + fuel_total_year, 2),
+        "total_month": round(total_month, 2),
+        "fuel_month": round(fuel_month, 2),
+        "grand_month": round(total_month + fuel_month, 2),
         "by_category": {k: round(v, 2) for k, v in by_category.items()},
         "by_car": {k: {c: round(v, 2) for c, v in cats.items()} for k, cats in by_car.items()},
         "consumption": consumption,
@@ -232,6 +277,7 @@ def compute_fleet(cars_view: list[dict[str, Any]], costs: dict[str, Any]) -> dic
         "critical": critical,
         "status": "OK" if total_alerts == 0 else "Atenție",
         "cost_year": costs["grand_total_year"],
+        "cost_month": costs["grand_month"],
     }
 
 

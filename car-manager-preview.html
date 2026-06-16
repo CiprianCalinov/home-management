@@ -75,12 +75,29 @@
       return r;
     }
 
+    function eqItem(v) {
+      if (v && typeof v === "object") return { has: !!(v.has || v.expira), expira: v.expira || null };
+      if (typeof v === "string" && v) return { has: true, expira: v };
+      return { has: false, expira: null };
+    }
+    function computeEquipment(car, t) {
+      const eq = car.equipment || {}, r = {};
+      [["trusa_medicala", "Trusă medicală"], ["stingator", "Stingător"]].forEach(([k, label]) => {
+        const it = eqItem(eq[k]); const days = daysUntil(it.expira, t);
+        r[k] = { label, has: it.has, expira: it.expira, zile_ramase: days,
+          alert: days != null && days <= ALERT_DAYS, expired: days != null && days < 0 };
+      });
+      return r;
+    }
+
     function attention(view) {
       const a = [];
       for (const f in view.legal) { const i = view.legal[f]; if (i.alert)
         a.push({ type: "legal", key: f, label: i.label, days: i.zile_ramase, severity: i.expired ? "critic" : "atentie" }); }
       for (const k in view.service) { const i = view.service[k]; if (i.alert)
         a.push({ type: "service", key: k, label: i.label, days: i.days_remaining, km: i.km_remaining, severity: i.overdue ? "critic" : "atentie" }); }
+      for (const k in (view.equipment || {})) { const i = view.equipment[k]; if (i.alert)
+        a.push({ type: "equipment", key: k, label: i.label, days: i.zile_ramase, severity: i.expired ? "critic" : "atentie" }); }
       a.sort((x, y) => (x.severity !== "critic") - (y.severity !== "critic") ||
         ((x.days ?? 9999) - (y.days ?? 9999)));
       return a;
@@ -88,7 +105,8 @@
 
     function carView(car, t) {
       const v = { id: car.id, name: car.name, make: car.make, model: car.model,
-        plate: car.plate, mileage: car.mileage || 0, legal: computeLegal(car, t), service: computeService(car, t) };
+        plate: car.plate, mileage: car.mileage || 0, legal: computeLegal(car, t),
+        service: computeService(car, t), equipment: computeEquipment(car, t) };
       v.attention = attention(v);
       v.status_ok = v.attention.length === 0;
       return v;
@@ -108,23 +126,32 @@
     }
 
     function buildView(raw, t) {
-      const year = t.getFullYear();
-      const eyear = (e) => { const d = new Date(e.date); return isNaN(d) ? null : d.getFullYear(); };
-      const byCat = {}, byCar = {}; let totalYear = 0;
-      (raw.costs || []).forEach((e) => {
-        if (eyear(e) === year) { const amt = e.amount || 0; totalYear += amt;
-          byCat[e.category] = (byCat[e.category] || 0) + amt;
-          byCar[e.car_id] = byCar[e.car_id] || {}; byCar[e.car_id][e.category] = (byCar[e.car_id][e.category] || 0) + amt; }
-      });
+      const year = t.getFullYear(), month = t.getMonth();
+      const pd = (s) => { const d = new Date(s); return isNaN(d) ? null : d; };
+      const byCat = {}, byCar = {}; let totalYear = 0, totalMonth = 0, fuelMonth = 0;
+      const addCost = (carId, cat, amt, d) => {
+        if (!d || d.getFullYear() !== year) return;
+        totalYear += amt; byCat[cat] = (byCat[cat] || 0) + amt;
+        byCar[carId] = byCar[carId] || {}; byCar[carId][cat] = (byCar[carId][cat] || 0) + amt;
+        if (d.getMonth() === month) totalMonth += amt;
+      };
+      (raw.costs || []).forEach((e) => addCost(e.car_id, e.category, e.amount || 0, pd(e.date)));
+      Object.values(raw.cars || {}).forEach((car) =>
+        (car.interventions || []).forEach((i) => addCost(car.id, "interventie", i.amount || 0, pd(i.date)))
+      );
       let fuelYear = 0;
-      (raw.fuel || []).forEach((e) => { if (eyear(e) === year) fuelYear += e.price_total || 0; });
+      (raw.fuel || []).forEach((e) => { const d = pd(e.date); if (d && d.getFullYear() === year) {
+        const p = e.price_total || 0; fuelYear += p; if (d.getMonth() === month) fuelMonth += p; } });
       const cars = Object.values(raw.cars || {}).map((c) => carView(c, t));
       const alerts = cars.reduce((s, c) => s + c.attention.length, 0);
       const critical = cars.reduce((s, c) => s + c.attention.filter((a) => a.severity === "critic").length, 0);
-      const costs = { year, total_year: Math.round(totalYear * 100) / 100, fuel_total_year: Math.round(fuelYear * 100) / 100,
-        grand_total_year: Math.round((totalYear + fuelYear) * 100) / 100, by_category: byCat, by_car: byCar, consumption: fuelConsumption(raw.fuel || []) };
+      const r2 = (n) => Math.round(n * 100) / 100;
+      const costs = { year, total_year: r2(totalYear), fuel_total_year: r2(fuelYear), grand_total_year: r2(totalYear + fuelYear),
+        total_month: r2(totalMonth), fuel_month: r2(fuelMonth), grand_month: r2(totalMonth + fuelMonth),
+        by_category: byCat, by_car: byCar, consumption: fuelConsumption(raw.fuel || []) };
       return { today: t.toISOString().slice(0, 10),
-        fleet: { cars: cars.length, alerts, critical, status: alerts ? "Atenție" : "OK", cost_year: costs.grand_total_year },
+        fleet: { cars: cars.length, alerts, critical, status: alerts ? "Atenție" : "OK",
+          cost_year: costs.grand_total_year, cost_month: costs.grand_month },
         cars, costs };
     }
 
@@ -138,7 +165,8 @@
                      lichid_frana: { last_date: "2023-01-01", interval_km: 0, interval_days: 730 } },
           equipment: { trusa_medicala: "2027-05-01", stingator: "2026-08-01", vesta: true, triunghi: true },
           battery: { install_date: "2024-03-15", warranty_months: 48 },
-          tires: { season: "vară", front_mm: 5.5, rear_mm: 6, change_date: "2026-04-01", note: "Michelin" } },
+          tires: { season: "vară", front_mm: 5.5, rear_mm: 6, change_date: "2026-04-01", note: "Michelin" },
+          interventions: [{ id: "i1", name: "Plăcuțe frână față", description: "Brembo", amount: 320, date: "2026-05-10", km: 80000 }] },
         c2: { id: "c2", name: "Octavia", make: "Skoda", model: "Octavia", plate: "B 99 XYZ", vin: "TMB...", year: 2020,
           mileage: 120000, mileage_date: "2026-06-10",
           legal: { rca: "2026-06-25", itp: "2027-02-01", rovinieta: "2026-06-18", casco: "2026-10-01" },
@@ -178,6 +206,8 @@
       delete_fuel: (m) => { raw.fuel = raw.fuel.filter((f) => f.id !== m.entry_id); return snapshot(); },
       add_cost: (m) => { raw.costs.push(Object.assign({ id: newId() }, m.entry)); return snapshot(); },
       delete_cost: (m) => { raw.costs = raw.costs.filter((c) => c.id !== m.entry_id); return snapshot(); },
+      add_intervention: (m) => { const car = raw.cars[m.car_id]; if (car) (car.interventions = car.interventions || []).push(Object.assign({ id: newId() }, m.item)); return snapshot(); },
+      delete_intervention: (m) => { const car = raw.cars[m.car_id]; if (car) car.interventions = (car.interventions || []).filter((i) => i.id !== m.item_id); return snapshot(); },
       update_settings: (m) => { Object.assign(raw.settings, m.settings); return snapshot(); },
       import_merge: () => snapshot(),
       // Decodare VIN demo (în HA real folosește serviciul NHTSA prin backend).

@@ -167,6 +167,36 @@ async def ws_scan(hass, connection, msg):
 
 
 @websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/add_intervention",
+        vol.Required("car_id"): str,
+        vol.Required("item"): dict,
+    }
+)
+@websocket_api.async_response
+async def ws_add_intervention(hass, connection, msg):
+    coordinator = _coordinator(hass)
+    await coordinator.store.async_add_intervention(msg["car_id"], msg["item"])
+    await coordinator.async_notify_changed()
+    connection.send_result(msg["id"], _snapshot(hass))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/delete_intervention",
+        vol.Required("car_id"): str,
+        vol.Required("item_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_delete_intervention(hass, connection, msg):
+    coordinator = _coordinator(hass)
+    await coordinator.store.async_delete_intervention(msg["car_id"], msg["item_id"])
+    await coordinator.async_notify_changed()
+    connection.send_result(msg["id"], _snapshot(hass))
+
+
+@websocket_api.websocket_command(
     {vol.Required("type"): f"{DOMAIN}/decode_vin", vol.Required("vin"): str}
 )
 @websocket_api.async_response
@@ -194,6 +224,8 @@ def async_register_websocket(hass: HomeAssistant) -> None:
         ws_import_merge,
         ws_scan,
         ws_decode_vin,
+        ws_add_intervention,
+        ws_delete_intervention,
     ):
         websocket_api.async_register_command(hass, handler)
     hass.data[DOMAIN]["ws_registered"] = True

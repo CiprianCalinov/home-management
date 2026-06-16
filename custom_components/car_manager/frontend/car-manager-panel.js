@@ -45,17 +45,13 @@ const TABS = [
   ["masini", "Mașini", "car"],
   ["costuri", "Costuri", "wallet"],
   ["statistici", "Statistici", "chart"],
-  ["combustibil", "Combustibil", "fuel"],
-  ["anvelope", "Anvelope", "tire"],
-  ["dotari", "Dotări", "kit"],
-  ["baterie", "Baterie", "battery"],
   ["setari", "Setări", "settings"],
 ];
 
 const TIRE_SEASONS = ["", "vară", "iarnă", "all-season"];
 
 // Fallback dacă panoul nu primește versiunea din config (ex. în preview).
-const PANEL_VERSION = "0.6.0";
+const PANEL_VERSION = "0.7.0";
 
 // Set propriu de iconițe line (24x24, stroke=currentColor) — fără emoji.
 const ICONS = {
@@ -75,6 +71,9 @@ const ICONS = {
   shield: '<path d="M12 3.2l7 2.8v5c0 4.4-3 7.5-7 9-4-1.5-7-4.6-7-9V6z"/><path d="M9 12l2.2 2.2L15.2 10"/>',
   alert: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.2"/><path d="M12 16.3h.02"/>',
   check: '<path d="M5 12.5l4.2 4.2L19 7"/>',
+  fwd: '<path d="M9 6l6 6-6 6"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
 };
 function icon(name, size = 20) {
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
@@ -269,8 +268,13 @@ class CarManagerPanel extends HTMLElement {
         <div class="hero-stats">
           ${this._hstat("car", fleet.cars, "mașini")}
           ${this._hstat("alert", fleet.alerts, "alerte", fleet.alerts ? "warn" : "")}
-          ${this._hstat("shield", fleet.critical, "critice", fleet.critical ? "danger" : "")}
-          ${this._hstat("wallet", fmtRon(fleet.cost_year), "an curent")}
+          ${
+            this._tab === "masini"
+              ? this._hstat("calendar", fmtRon(fleet.cost_month), "luna aceasta") +
+                this._hstat("wallet", fmtRon(fleet.cost_year), "anul curent")
+              : this._hstat("shield", fleet.critical, "critice", fleet.critical ? "danger" : "") +
+                this._hstat("calendar", fmtRon(fleet.cost_month), "luna aceasta")
+          }
         </div>
       </header>`;
   }
@@ -296,19 +300,13 @@ class CarManagerPanel extends HTMLElement {
       case "acasa":
         return this._home();
       case "masini":
-        return this._editing ? this._carForm() : this._cars();
+        if (this._editing) return this._carForm();
+        if (this._detailCar) return this._carDetail(this._detailCar);
+        return this._cars();
       case "costuri":
         return this._costs();
       case "statistici":
         return this._stats();
-      case "combustibil":
-        return this._fuel();
-      case "anvelope":
-        return this._tires();
-      case "dotari":
-        return this._equipment();
-      case "baterie":
-        return this._battery();
       case "setari":
         return this._settings();
       default:
@@ -333,11 +331,10 @@ class CarManagerPanel extends HTMLElement {
         <div class="overline">ACASĂ</div>
         <h2>Privire de ansamblu</h2>
         <div class="kpis">
-          ${this._kpi("Autovehicule", cars.length, "mașini")}
+          ${this._kpi("Cheltuieli luna asta", fmtRon(costs.grand_month), "toate")}
+          ${this._kpi("Combustibil luna", fmtRon(costs.fuel_month), "")}
           ${this._kpi("Alerte", view.fleet.alerts, `${view.fleet.critical} critice`)}
-          ${this._kpi("Cost an curent", fmtRon(costs.total_year), "intervenții & taxe")}
-          ${this._kpi("Combustibil", fmtRon(costs.fuel_total_year), `total ${costs.year}`)}
-          ${this._kpi("Total an", fmtRon(costs.grand_total_year), "toate cheltuielile")}
+          ${this._kpi("Autovehicule", cars.length, "mașini")}
         </div>
       </section>
 
@@ -384,15 +381,15 @@ class CarManagerPanel extends HTMLElement {
       })
       .join("");
 
-    const svc = Object.values(c.service)
-      .filter((s) => s.alert)
-      .map((s) => `<span class="tag warn">${esc(s.label)}</span>`)
-      .join("");
+    const crit = c.attention.filter((a) => a.severity === "critic").length;
+    const badge = c.attention.length
+      ? `<span class="alert-badge ${crit ? "critic" : "atentie"}">${icon("alert", 13)} ${c.attention.length}</span>`
+      : `<span class="alert-badge ok">${icon("check", 13)} OK</span>`;
 
     return `
-      <div class="car">
+      <div class="car" data-action="open-car" data-id="${c.id}">
         <div class="row-between">
-          <div class="car-name">${icon("car", 18)} ${esc(c.name)}</div>
+          <div class="car-name">${icon("car", 18)} ${esc(c.name)} ${badge}</div>
           <div class="car-actions">
             <button class="icon-btn" data-action="edit-car" data-id="${c.id}" title="Editează">${icon("edit", 16)}</button>
             <button class="icon-btn" data-action="del-car" data-id="${c.id}" title="Șterge">${icon("trash", 16)}</button>
@@ -402,7 +399,7 @@ class CarManagerPanel extends HTMLElement {
       c.mileage ? c.mileage.toLocaleString("ro-RO") + " km" : "—"
     }</div>
         ${chips ? `<div class="chips">${chips}</div>` : `<div class="muted small" style="margin-top:8px">Niciun termen adăugat</div>`}
-        ${svc ? `<div class="tags">${svc}</div>` : ""}
+        <div class="car-cta muted small">Detalii ${icon("back", 13)}</div>
       </div>`;
   }
 
@@ -771,60 +768,287 @@ class CarManagerPanel extends HTMLElement {
     return (this._data.raw.cars || {})[this._editing.id] || null;
   }
 
+  // ----------------------------------------------------------- DETALIU MAȘINĂ
+  _carDetail(carId) {
+    const raw = (this._data.raw.cars || {})[carId];
+    const view = this._data.view.cars.find((c) => c.id === carId);
+    if (!raw || !view) {
+      this._detailCar = null;
+      return this._cars();
+    }
+    const fuel = (this._data.raw.fuel || [])
+      .filter((f) => f.car_id === carId)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const interventions = (raw.interventions || [])
+      .slice()
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const cons = (this._data.view.costs.consumption || {})[carId];
+    const entries = this._carCostEntries(carId);
+    const carTotal = entries.reduce((s, e) => s + (e.amount || 0), 0);
+
+    const chips = LEGAL_DEFS.filter((d) => view.legal[d.key].configured)
+      .map((d) => {
+        const info = view.legal[d.key];
+        return `<div class="chip ${this._chipClass(info)}"><div class="chip-label">${d.label}</div><div class="chip-val">${this._chipText(info)}</div></div>`;
+      })
+      .join("");
+
+    const svc = Object.values(view.service);
+    const svcRows = svc.length
+      ? svc
+          .map(
+            (s) =>
+              `<div class="line-row"><span>${esc(s.label)}</span><span class="${
+                s.alert ? (s.overdue ? "t-danger" : "t-warn") : "muted"
+              }">${[
+                s.km_remaining != null ? s.km_remaining + " km" : "",
+                s.days_remaining != null ? s.days_remaining + " zile" : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}</span></div>`
+          )
+          .join("")
+      : `<div class="muted small">Nicio revizie urmărită — apasă Editează.</div>`;
+
+    const eq = raw.equipment || {};
+    const trusa = this._eqDate(eq.trusa_medicala);
+    const sting = this._eqDate(eq.stingator);
+    const eqTag = (label, has, extra) =>
+      `<span class="tag ${has ? "ok" : "warn"}">${esc(label)} ${has ? "✓" : "✗"}${has && extra ? " · " + esc(extra) : ""}</span>`;
+    const tires = raw.tires || {};
+    const bat = raw.battery || {};
+    let batInfo = "neconfigurată";
+    if (bat.install_date) {
+      const end = new Date(bat.install_date);
+      end.setMonth(end.getMonth() + (bat.warranty_months || 48));
+      const days = Math.round((end - new Date()) / 86400000);
+      batInfo = `montată ${bat.install_date} · garanție ~${days} zile`;
+    }
+
+    return `
+      <section class="card">
+        <div class="detail-top">
+          <button class="btn" data-action="back-detail">${icon("back", 16)} Mașini</button>
+          <button class="btn" data-action="edit-car" data-id="${carId}">${icon("edit", 16)} Editează</button>
+        </div>
+        <div class="detail-head">
+          <div class="logo detail-logo">${icon("car", 26)}</div>
+          <div>
+            <h2>${esc(view.name)}</h2>
+            <div class="muted">${esc(raw.make || "")} ${esc(raw.model || "")} ${
+      raw.plate ? "· " + esc(raw.plate) : ""
+    } · ${view.mileage ? view.mileage.toLocaleString("ro-RO") + " km" : "—"}</div>
+          </div>
+        </div>
+        <h3>Termene legale</h3>
+        ${chips ? `<div class="chips">${chips}</div>` : `<div class="muted small">Niciun termen — apasă Editează.</div>`}
+        <h3>Revizii & consumabile</h3>
+        <div class="lines">${svcRows}</div>
+        <h3>Dotări, baterie & anvelope</h3>
+        <div class="tags">
+          ${eqTag("Trusă", trusa.has, trusa.expira ? "exp. " + trusa.expira : "")}
+          ${eqTag("Stingător", sting.has, sting.expira ? "exp. " + sting.expira : "")}
+          ${eqTag("Vestă", !!eq.vesta, "")}
+          ${eqTag("Triunghi", !!eq.triunghi, "")}
+          <span class="tag">${icon("battery", 14)} ${esc(batInfo)}</span>
+          ${
+            tires.season
+              ? `<span class="tag">${icon("tire", 14)} ${esc(tires.season)}${tires.front_mm ? " · " + tires.front_mm + " mm" : ""}</span>`
+              : ""
+          }
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row-between"><h3 style="margin-top:0">${icon("fuel", 18)} Combustibil</h3>
+          ${cons ? `<span class="pill">${cons} L/100km</span>` : ""}</div>
+        <div class="form-grid">
+          <label>Data<input type="date" id="df-date" value="${this._today()}"></label>
+          <label>Litri<input type="number" id="df-liters" step="0.01"></label>
+          <label>Sumă (RON)<input type="number" id="df-price" step="0.01"></label>
+          <label>Km bord<input type="number" id="df-odo"></label>
+          <label class="check"><input type="checkbox" id="df-full" checked> Plin</label>
+        </div>
+        <div class="form-actions">
+          <button class="btn" data-action="scan-fuel">${icon("camera", 16)} Scanează bon</button>
+          <button class="btn primary" data-action="add-fuel-detail" data-id="${carId}">${icon("plus", 16)} Adaugă alimentare</button>
+        </div>
+        ${
+          fuel.length
+            ? `<table class="tbl"><thead><tr><th>Data</th><th>Litri</th><th>Sumă</th><th>Km</th><th></th></tr></thead><tbody>${fuel
+                .map(
+                  (f) =>
+                    `<tr><td>${esc(f.date || "")}</td><td>${f.liters ?? "—"}</td><td>${fmtRon(
+                      f.price_total
+                    )}</td><td>${f.odometer ? f.odometer.toLocaleString("ro-RO") : "—"}</td><td><button class="icon-btn" data-action="del-fuel" data-id="${f.id}">${icon("trash", 15)}</button></td></tr>`
+                )
+                .join("")}</tbody></table>`
+            : `<div class="muted small" style="margin-top:10px">Nicio alimentare încă.</div>`
+        }
+      </section>
+
+      <section class="card">
+        <h3 style="margin-top:0">${icon("kit", 18)} Intervenții / reparații</h3>
+        <div class="form-grid">
+          <label>Nume<input id="di-name" placeholder="ex. Planetară stânga"></label>
+          <label>Descriere<input id="di-desc"></label>
+          <label>Cost (RON)<input type="number" id="di-amount" step="0.01"></label>
+          <label>Data<input type="date" id="di-date" value="${this._today()}"></label>
+          <label>La km<input type="number" id="di-km"></label>
+        </div>
+        <div class="form-actions"><button class="btn primary" data-action="add-int-detail" data-id="${carId}">${icon("plus", 16)} Adaugă intervenție</button></div>
+        ${
+          interventions.length
+            ? `<table class="tbl"><thead><tr><th>Data</th><th>Nume</th><th>Cost</th><th>Km</th><th></th></tr></thead><tbody>${interventions
+                .map(
+                  (i) =>
+                    `<tr><td>${esc(i.date || "")}</td><td>${esc(i.name || i.description || "—")}</td><td>${fmtRon(
+                      i.amount
+                    )}</td><td>${i.km ? i.km.toLocaleString("ro-RO") : "—"}</td><td><button class="icon-btn" data-action="del-int-saved" data-car="${carId}" data-id="${i.id}">${icon("trash", 15)}</button></td></tr>`
+                )
+                .join("")}</tbody></table>`
+            : `<div class="muted small" style="margin-top:10px">Nicio intervenție încă.</div>`
+        }
+      </section>
+
+      <section class="card">
+        <div class="row-between"><h3 style="margin-top:0">${icon("wallet", 18)} Cheltuieli mașină</h3><span class="pill">${fmtRon(carTotal)}</span></div>
+        ${
+          entries.length
+            ? `<table class="tbl"><thead><tr><th>Data</th><th>Categorie</th><th>Sumă</th><th>Notă</th></tr></thead><tbody>${entries
+                .map(
+                  (e) =>
+                    `<tr><td>${esc(e.date || "")}</td><td>${esc(this._catLabel(e.cat))}</td><td>${fmtRon(
+                      e.amount
+                    )}</td><td>${esc(e.note || "")}</td></tr>`
+                )
+                .join("")}</tbody></table>`
+            : `<div class="muted small" style="margin-top:10px">Nicio cheltuială.</div>`
+        }
+      </section>`;
+  }
+
+  _catLabel(cat) {
+    const extra = { interventie: "Intervenție", service: "Service" };
+    return extra[cat] || Object.fromEntries(COST_CATEGORIES)[cat] || cat;
+  }
+
+  _carCostEntries(carId) {
+    const out = [];
+    (this._data.raw.costs || [])
+      .filter((c) => c.car_id === carId)
+      .forEach((c) => out.push({ id: c.id, src: "cost", date: c.date, cat: c.category, amount: c.amount, note: c.note }));
+    const raw = (this._data.raw.cars || {})[carId] || {};
+    (raw.interventions || []).forEach((i) =>
+      out.push({ id: i.id, src: "int", date: i.date, cat: "interventie", amount: i.amount, note: i.name || i.description })
+    );
+    (this._data.raw.fuel || [])
+      .filter((f) => f.car_id === carId)
+      .forEach((f) => out.push({ id: f.id, src: "fuel", date: f.date, cat: "combustibil", amount: f.price_total, note: f.liters ? f.liters + " L" : "" }));
+    return out.filter((e) => e.amount != null).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }
+
+  _addFuelDetail(carId) {
+    const g = (id) => this.shadowRoot.getElementById(id);
+    const entry = {
+      car_id: carId,
+      date: g("df-date").value,
+      liters: Number(g("df-liters").value || 0),
+      price_total: Number(g("df-price").value || 0),
+      odometer: g("df-odo").value ? Number(g("df-odo").value) : null,
+      full: g("df-full").checked,
+    };
+    if (!entry.liters && !entry.price_total) {
+      this._toast("Introdu litri sau sumă.");
+      return;
+    }
+    this._mutate("add_fuel", { entry });
+  }
+
+  _addIntDetail(carId) {
+    const g = (id) => this.shadowRoot.getElementById(id);
+    const item = {
+      name: g("di-name").value.trim(),
+      description: g("di-desc").value.trim(),
+      amount: g("di-amount").value ? Number(g("di-amount").value) : null,
+      date: g("di-date").value || null,
+      km: g("di-km").value ? Number(g("di-km").value) : null,
+    };
+    if (!item.name && item.amount == null) {
+      this._toast("Pune un nume sau o sumă.");
+      return;
+    }
+    this._mutate("add_intervention", { car_id: carId, item });
+  }
+
+  _costDelBtn(e, carId) {
+    if (e.src === "cost") return `<button class="icon-btn" data-action="del-cost" data-id="${e.id}">${icon("trash", 15)}</button>`;
+    if (e.src === "fuel") return `<button class="icon-btn" data-action="del-fuel" data-id="${e.id}">${icon("trash", 15)}</button>`;
+    if (e.src === "int") return `<button class="icon-btn" data-action="del-int-saved" data-car="${carId}" data-id="${e.id}">${icon("trash", 15)}</button>`;
+    return "";
+  }
+
   // ----------------------------------------------------------- COSTURI
   _costs() {
     const costs = this._data.view.costs;
-    const raw = this._data.raw.costs || [];
-    const cars = this._data.raw.cars || {};
-    const list = [...raw].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const carList = Object.values(this._data.raw.cars || {});
 
     return `
       <section class="card">
         <div class="overline">COSTURI</div>
-        <h2>Costuri complete</h2>
+        <h2>Cheltuieli</h2>
         <div class="kpis">
-          ${this._kpi("Intervenții & taxe", fmtRon(costs.total_year), "an curent")}
-          ${this._kpi("Combustibil", fmtRon(costs.fuel_total_year), "an curent")}
-          ${this._kpi("Total", fmtRon(costs.grand_total_year), `${costs.year}`)}
+          ${this._kpi("Luna aceasta", fmtRon(costs.grand_month), "toate")}
+          ${this._kpi("Anul curent", fmtRon(costs.grand_total_year), `${costs.year}`)}
+          ${this._kpi("Combustibil an", fmtRon(costs.fuel_total_year), "")}
+          ${this._kpi("Service & taxe an", fmtRon(costs.total_year), "")}
         </div>
       </section>
 
       <section class="card">
-        <h3>Adaugă cheltuială</h3>
+        <h3 style="margin-top:0">Adaugă cheltuială</h3>
+        <p class="muted small">Combustibilul apare automat la mașină + consum. „Service / Intervenție" se salvează ca intervenție la mașină.</p>
         <div class="form-grid">
           <label>Mașină<select id="cost-car">${this._carOptions()}</select></label>
-          <label>Data<input type="date" id="cost-date" value="${this._today()}"></label>
           <label>Categorie<select id="cost-cat">${COST_CATEGORIES.map(
             ([v, l]) => `<option value="${v}">${l}</option>`
           ).join("")}</select></label>
           <label>Sumă (RON)<input type="number" id="cost-amount" step="0.01"></label>
-          <label>Notă<input id="cost-note"></label>
+          <label>Data<input type="date" id="cost-date" value="${this._today()}"></label>
+          <label>Notă / nume<input id="cost-note"></label>
+          <label>Litri (combustibil)<input type="number" id="cost-liters" step="0.01"></label>
+          <label>Km bord (combustibil)<input type="number" id="cost-odo"></label>
         </div>
         <div class="form-actions">
           <button class="btn" data-action="scan-cost">${icon("camera", 16)} Scanează bon</button>
-          <button class="btn primary" data-action="add-cost">Adaugă</button>
+          <button class="btn primary" data-action="add-cost">${icon("plus", 16)} Adaugă</button>
         </div>
       </section>
 
-      <section class="card">
-        <h3>Istoric cheltuieli</h3>
-        ${
-          list.length
-            ? `<table class="tbl"><thead><tr><th>Data</th><th>Mașină</th><th>Categorie</th><th>Sumă</th><th>Notă</th><th></th></tr></thead><tbody>${list
-                .map(
-                  (c) => `<tr>
-            <td>${esc(c.date || "")}</td>
-            <td>${esc((cars[c.car_id] || {}).name || "—")}</td>
-            <td>${esc(c.category)}</td>
-            <td>${fmtRon(c.amount)}</td>
-            <td>${esc(c.note || "")}</td>
-            <td><button class="icon-btn" data-action="del-cost" data-id="${c.id}">${icon("trash", 16)}</button></td>
-          </tr>`
-                )
-                .join("")}</tbody></table>`
-            : `<div class="muted">Nicio cheltuială înregistrată.</div>`
-        }
-      </section>`;
+      ${
+        carList.length
+          ? carList
+              .map((car) => {
+                const entries = this._carCostEntries(car.id);
+                if (!entries.length) return "";
+                const total = entries.reduce((s, e) => s + (e.amount || 0), 0);
+                return `<section class="card">
+          <div class="row-between"><h3 style="margin-top:0">${icon("car", 17)} ${esc(car.name)}</h3><span class="pill">${fmtRon(total)}</span></div>
+          <table class="tbl"><thead><tr><th>Data</th><th>Categorie</th><th>Sumă</th><th>Notă</th><th></th></tr></thead><tbody>
+          ${entries
+            .map(
+              (e) =>
+                `<tr><td>${esc(e.date || "")}</td><td>${esc(this._catLabel(e.cat))}</td><td>${fmtRon(
+                  e.amount
+                )}</td><td>${esc(e.note || "")}</td><td>${this._costDelBtn(e, car.id)}</td></tr>`
+            )
+            .join("")}
+          </tbody></table>
+        </section>`;
+              })
+              .join("")
+          : `<section class="card"><div class="muted">Nicio cheltuială încă. Adaugă mai sus.</div></section>`
+      }`;
   }
 
   // ----------------------------------------------------------- STATISTICI
@@ -1099,12 +1323,16 @@ class CarManagerPanel extends HTMLElement {
       el.addEventListener("click", () => {
         this._tab = el.dataset.tab;
         this._editing = null;
+        this._detailCar = null;
         this._render();
       })
     );
 
     root.querySelectorAll("[data-action]").forEach((el) =>
-      el.addEventListener("click", (ev) => this._onAction(el.dataset.action, el, ev))
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this._onAction(el.dataset.action, el, ev);
+      })
     );
 
     root.querySelectorAll(".cm-toggle").forEach((cb) =>
@@ -1145,19 +1373,33 @@ class CarManagerPanel extends HTMLElement {
     switch (action) {
       case "add-car":
         this._tab = "masini";
+        this._detailCar = null;
         this._editing = {};
         this._render();
         break;
       case "edit-car": {
         const raw = (this._data.raw.cars || {})[el.dataset.id];
         this._tab = "masini";
+        this._detailCar = null;
         this._editing = JSON.parse(JSON.stringify(raw || {}));
         this._render();
         break;
       }
+      case "open-car":
+        this._tab = "masini";
+        this._editing = null;
+        this._detailCar = el.dataset.id;
+        this._render();
+        break;
+      case "back-detail":
+        this._detailCar = null;
+        this._render();
+        break;
       case "del-car":
-        if (confirm("Ștergi acest autovehicul și toate datele asociate?"))
+        if (confirm("Ștergi acest autovehicul și toate datele asociate?")) {
+          this._detailCar = null;
           this._mutate("delete_car", { car_id: el.dataset.id });
+        }
         break;
       case "cancel-car":
         this._editing = null;
@@ -1190,6 +1432,15 @@ class CarManagerPanel extends HTMLElement {
         break;
       case "verify-rca":
         this._verifyRca();
+        break;
+      case "add-fuel-detail":
+        this._addFuelDetail(el.dataset.id);
+        break;
+      case "add-int-detail":
+        this._addIntDetail(el.dataset.id);
+        break;
+      case "del-int-saved":
+        this._mutate("delete_intervention", { car_id: el.dataset.car, item_id: el.dataset.id });
         break;
       case "add-cost":
         this._addCost();
@@ -1270,18 +1521,35 @@ class CarManagerPanel extends HTMLElement {
 
   _addCost() {
     const g = (id) => this.shadowRoot.getElementById(id);
-    const entry = {
-      car_id: g("cost-car").value,
-      date: g("cost-date").value,
-      category: g("cost-cat").value,
-      amount: Number(g("cost-amount").value || 0),
-      note: g("cost-note").value,
-    };
-    if (!entry.car_id || !entry.amount) {
+    const carId = g("cost-car").value;
+    const cat = g("cost-cat").value;
+    const amount = Number(g("cost-amount").value || 0);
+    const date = g("cost-date").value;
+    const note = g("cost-note").value;
+    if (!carId || !amount) {
       this._toast("Alege mașina și introdu suma.");
       return;
     }
-    this._mutate("add_cost", { entry });
+    // Rutează către sursa corectă, ca datele să fie unificate peste tot.
+    if (cat === "combustibil") {
+      this._mutate("add_fuel", {
+        entry: {
+          car_id: carId,
+          date,
+          liters: g("cost-liters").value ? Number(g("cost-liters").value) : 0,
+          price_total: amount,
+          odometer: g("cost-odo").value ? Number(g("cost-odo").value) : null,
+          full: true,
+        },
+      });
+    } else if (cat === "service" || cat === "interventie") {
+      this._mutate("add_intervention", {
+        car_id: carId,
+        item: { name: note || "Intervenție", description: note, amount, date },
+      });
+    } else {
+      this._mutate("add_cost", { entry: { car_id: carId, date, category: cat, amount, note } });
+    }
   }
 
   _addFuel() {
@@ -1421,11 +1689,16 @@ class CarManagerPanel extends HTMLElement {
   }
 
   _applyFuel(d) {
+    // detaliu mașină (df-*) sau, ca fallback, vechiul tab (fuel-*)
+    this._setField("df-date", d.date);
+    this._setField("df-liters", d.liters);
+    this._setField("df-price", d.price_total);
+    this._setField("df-odo", d.odometer);
     this._setField("fuel-date", d.date);
     this._setField("fuel-liters", d.liters);
     this._setField("fuel-price", d.price_total);
     this._setField("fuel-odo", d.odometer);
-    this._toast("Date completate din bon. Verifică și apasă Adaugă bon.");
+    this._toast("Date completate din bon. Verifică și apasă Adaugă.");
   }
 
   _applyCost(d) {
@@ -1663,6 +1936,24 @@ class CarManagerPanel extends HTMLElement {
       .bar-label { width:170px; font-size:13.5px; } .bar-val { width:110px; text-align:right; font-weight:700; font-size:13.5px; }
       .bar { flex:1; background:var(--surface-3); border-radius:999px; height:9px; overflow:hidden; }
       .bar-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-deep)); border-radius:999px; }
+
+      .car { cursor:pointer; }
+      .car-cta { margin-top:13px; display:flex; align-items:center; gap:4px; color:var(--accent-deep); font-weight:600; font-size:13px; }
+      .car-cta .ic { transition:transform .15s; }
+      .car:hover .car-cta .ic { transform:translateX(3px); }
+      .alert-badge { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:700;
+        padding:3px 9px; border-radius:999px; }
+      .alert-badge.ok { background:var(--accent-soft); color:var(--accent-deep); }
+      .alert-badge.atentie { background:var(--warn-soft); color:#b76e00; }
+      .alert-badge.critic { background:rgba(255,59,48,.16); color:var(--danger); }
+      .detail-top { display:flex; justify-content:space-between; gap:10px; margin-bottom:20px; }
+      .detail-head { display:flex; align-items:center; gap:16px; margin-bottom:6px; }
+      .detail-logo { width:52px; height:52px; }
+      .lines { display:flex; flex-direction:column; margin-top:8px; }
+      .line-row { display:flex; justify-content:space-between; gap:12px; padding:10px 2px;
+        border-bottom:1px solid var(--hairline); font-size:14px; }
+      .line-row:last-child { border-bottom:none; }
+      .t-warn { color:var(--warn); font-weight:600; } .t-danger { color:var(--danger); font-weight:600; }
 
       .empty { text-align:center; padding:56px 16px; }
       .empty-icon { color:var(--accent); } .empty h3 { margin-top:14px; }
